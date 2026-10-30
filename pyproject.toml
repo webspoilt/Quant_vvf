@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "quant-vrp"
+version = "0.1.0"
+description = "Falsification-first Volatility Risk Premium research & execution engine (Deribit BTC)"
+requires-python = ">=3.11"
+dependencies = [
+    "numpy>=2.0",
+    "pandas>=3.0",
+    "scipy>=1.14",
+    "statsmodels>=0.14",
+    "pyarrow>=14.0",
+    "pyyaml>=6.0",
+    "requests>=2.31",
+]
+
+[project.optional-dependencies]
+prod = ["nautilus-trader>=1.190"]
+dev = ["pytest>=7.4", "mypy>=1.8"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+markers = [
+    "realdata: tests that download/ingest real market data (slow, network)",
+]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+files = ["libs/core/inverse_payoffs.py", "libs/data/canonical_store.py"]
+
+[[tool.mypy.overrides]]
+module = ["scipy.*", "pyarrow.*", "statsmodels.*", "nautilus_trader.*"]
+ignore_missing_imports = true

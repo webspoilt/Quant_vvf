@@ -1,0 +1,11 @@
+__pycache__/
+*.py[cod]
+.mypy_cache/
+.pytest_cache/
+.ipynb_checkpoints/
+data/raw/*.csv.gz
+data/processed/*.parquet
+data/processed/*.meta.json
+*.egg-info/
+dist/
+build/
