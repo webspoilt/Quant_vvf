@@ -55,10 +55,10 @@ def store(tmp_path: Path) -> CanonicalStore:
 class TestPointInTimeSemantics:
     def test_query_returns_only_both_stamp_eligible_rows(self, store: CanonicalStore) -> None:
         result = store.query("test_quotes", as_of_ns=2000 * NS)
-        # r2 is inclusive at exactly t (<=); r3 excluded because received 2100 > 2000.
-        assert list(result["symbol"]) == ["BTC-1AUG20-9000-C"] or all(
-            row <= 2000 for row in result[["event_ts_ns", "received_ts_ns"]].to_numpy().ravel()
-        )
+        # r1 (1000/1000) and r2 (2000/2000) are admissible; r3 is excluded
+        # because received 2100 > 2000. V-28 fix: the original `or all(...)`
+        # masked assertion hid the r1 omission and could not fail loudly.
+        assert list(result["symbol"]) == ["BTC-1AUG20-8000-P", "BTC-1AUG20-9000-C"]
         assert result["event_ts_ns"].max() <= 2000
         assert result["received_ts_ns"].max() <= 2000
 

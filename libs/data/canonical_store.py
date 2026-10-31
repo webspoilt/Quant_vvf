@@ -40,6 +40,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
+import re
+import uuid
 from pathlib import Path
 from typing import Any, Sequence
 
@@ -47,6 +50,7 @@ import pandas as pd
 
 __all__ = [
     "MAX_CLOCK_SKEW_NS",
+    "DATASET_NAME_PATTERN",
     "CanonicalStore",
     "LookaheadViolationError",
     "StoreIntegrityError",
@@ -55,8 +59,54 @@ __all__ = [
 
 MAX_CLOCK_SKEW_NS: int = 60_000_000_000  # 60 seconds of tolerated clock skew
 
+#: Dataset names are filesystem path components; they must never carry path
+#: separators, traversal sequences, or shell-surprising characters (V-04).
+DATASET_NAME_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,128}$")
+
 #: Columns every canonical dataset must contain (payload columns follow).
 CANONICAL_KEY_COLUMNS: tuple[str, ...] = ("event_ts_ns", "received_ts_ns")
+
+
+def _require_safe_dataset_name(dataset: str) -> None:
+    """Raise ``ValueError`` for any dataset name that is not a safe component.
+
+    Rejects path separators (``/``, ``\\``), traversal (``..`` in any form the
+    regex can express), absolute-path prefixes, and byte-level anomalies via
+    prefix validation. This is a name whitelist, not a black list.
+    """
+    if not isinstance(dataset, str):
+        raise ValueError(f"Invalid dataset name {dataset!r}: expected a string")
+    if not DATASET_NAME_PATTERN.match(dataset) or ".." in dataset:
+        raise ValueError(
+            f"Invalid dataset name {dataset!r}: must match "
+            f"{DATASET_NAME_PATTERN.pattern} (no path separators or '..')"
+        )
+
+
+def _atomic_write_text(target: Path, text: str) -> None:
+    """Write ``text`` to ``target`` atomically (temp file + os.replace, V-19).
+
+    A partial JSON sidecar from a crash would desynchronize data/meta state;
+    ``os.replace`` guarantees readers see either the old or the new file.
+    """
+    tmp = target.with_name(f".{target.name}.tmp-{os.getpid()}-{uuid.uuid4().hex[:12]}")
+    try:
+        tmp.write_text(text)
+        os.replace(tmp, target)
+    finally:
+        if tmp.exists():
+            tmp.unlink()
+
+
+def _atomic_replace_parquet(target: Path, df: pd.DataFrame) -> None:
+    """Write ``df`` to ``target`` (parquet) atomically (V-19)."""
+    tmp = target.with_name(f".{target.name}.tmp-{os.getpid()}-{uuid.uuid4().hex[:12]}")
+    try:
+        df.to_parquet(tmp, engine="pyarrow")
+        os.replace(tmp, target)
+    finally:
+        if tmp.exists():
+            tmp.unlink()
 
 
 def _point_in_time_mask(df: pd.DataFrame, as_of_ns: int) -> pd.Series:
@@ -146,15 +196,15 @@ class CanonicalStore:
             )
         out = df.sort_values(dup_cols, kind="stable").reset_index(drop=True)
         self._frames[dataset] = out
-        shard = self.root / f"{dataset}.parquet"
-        out.to_parquet(shard, engine="pyarrow")
+        shard = self._dataset_shard_path(dataset)
+        _atomic_replace_parquet(shard, out)
         sidecar = {
             "dataset": dataset,
             "rows": int(len(out)),
             "columns": list(out.columns),
             "content_sha256": self._fingerprint(out),
         }
-        (self.root / f"{dataset}.meta.json").write_text(json.dumps(sidecar, indent=2))
+        _atomic_write_text(self._meta_path(dataset), json.dumps(sidecar, indent=2))
         return int(len(out))
 
     def refresh_from_disk(self, datasets: Sequence[str] | None = None) -> list[str]:
@@ -162,7 +212,7 @@ class CanonicalStore:
         if datasets is None:
             datasets = sorted(p.stem.rsplit(".", 1)[0] for p in self.root.glob("*.parquet"))
         for name in datasets:
-            self._frames[name] = pd.read_parquet(self.root / f"{name}.parquet")
+            self._frames[name] = pd.read_parquet(self._dataset_shard_path(name))
         return list(datasets)
 
     # ----------------------------------------------------------------- query
@@ -230,9 +280,27 @@ class CanonicalStore:
             )
 
     # ---------------------------------------------------------------- internals
+    def _dataset_shard_path(self, dataset: str) -> Path:
+        """Resolve the parquet shard path for ``dataset`` with containment.
+
+        V-04: the dataset name is whitelisted and the resolved path must stay
+        inside ``self.root`` — an unsanitized ``../../name`` input previously
+        allowed reading/overwriting arbitrary ``*.parquet`` files.
+        """
+        _require_safe_dataset_name(dataset)
+        shard = (self.root / f"{dataset}.parquet").resolve()
+        root_resolved = self.root.resolve()
+        if not shard.is_relative_to(root_resolved):
+            raise ValueError(f"Path traversal detected for dataset {dataset!r}")
+        return shard
+
+    def _meta_path(self, dataset: str) -> Path:
+        """Resolve the JSON sidecar path from the validated shard path."""
+        return self._dataset_shard_path(dataset).with_name(f"{dataset}.meta.json")
+
     def _get(self, dataset: str) -> pd.DataFrame:
+        shard = self._dataset_shard_path(dataset)
         if dataset not in self._frames:
-            shard = self.root / f"{dataset}.parquet"
             if not shard.exists():
                 raise KeyError(f"unknown dataset {dataset!r} (no shard at {shard})")
             self.refresh_from_disk([dataset])

@@ -195,7 +195,7 @@ def test_phase0_real_data_feasibility_gate(preload_report: None = None) -> None:
     processed = root / "data" / "processed"
 
     from libs.data.canonical_store import CanonicalStore, LookaheadViolationError  # noqa: F401
-    from libs.data.ingest_tardis import ingest_btc_option_quotes
+    from libs.data.deribit_loader import ingest_btc_option_quotes
 
     try:
         rows, dataset = ingest_btc_option_quotes(2020, 11, 1, raw_dir, processed)

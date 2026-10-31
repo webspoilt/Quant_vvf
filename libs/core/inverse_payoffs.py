@@ -92,6 +92,7 @@ __all__ = [
     "straddle_delta_usd",
     "straddle_premium_usd",
     "usd_to_btc_cash",
+    "DeribitInversePricer",
 ]
 
 OptionType = Literal["call", "put"]
@@ -288,7 +289,9 @@ def option_payoff_btc(option_type: OptionType, strike: float, settlement_price: 
     _validate_vanilla_inputs(strike, settlement_price)
     if option_type == "call":
         return max(0.0, settlement_price - strike) / settlement_price
-    return max(0.0, strike - settlement_price) / settlement_price
+    if option_type == "put":
+        return max(0.0, strike - settlement_price) / settlement_price
+    raise ValueError(f"Unrecognized option_type {option_type!r}: expected 'call' or 'put'")
 
 
 def option_payoff_usd(option_type: OptionType, strike: float, settlement_price: float) -> float:
@@ -296,7 +299,9 @@ def option_payoff_usd(option_type: OptionType, strike: float, settlement_price: 
     _validate_vanilla_inputs(strike, settlement_price)
     if option_type == "call":
         return max(0.0, settlement_price - strike)
-    return max(0.0, strike - settlement_price)
+    if option_type == "put":
+        return max(0.0, strike - settlement_price)
+    raise ValueError(f"Unrecognized option_type {option_type!r}: expected 'call' or 'put'")
 
 
 def straddle_premium_usd(
@@ -314,7 +319,7 @@ def straddle_premium_usd(
         d1 = (ln(S/F) + 0.5*sigma^2*T) / (sigma*sqrt(T)),
         d2 = d1 - sigma*sqrt(T),
         call = exp(-r*T) * (F*N(d1) - K*N(d2)),
-        put  = call - S*exp(-r*T) + K*exp(-r*T)
+        put  = call - (F - K)*exp(-r*T) = call - S + K*exp(-r*T)
 
     Returns
     -------
@@ -329,11 +334,11 @@ def straddle_premium_usd(
         raise ValueError(f"r must be >= 0, got {r}")
     sq = sigma * _sqrt(tau_years)
     fwd = spot * _exp(r * tau_years)
-    d1 = (_log_f(spot / fwd) + 0.5 * sigma * sigma * tau_years) / sq
+    d1 = (_log_f(fwd / strike) + 0.5 * sigma * sigma * tau_years) / sq
     d2 = d1 - sq
     df = _exp(-r * tau_years)
     call = df * (fwd * float(stats.norm.cdf(d1)) - strike * float(stats.norm.cdf(d2)))
-    put = call - spot * df + strike * df
+    put = call - (fwd - strike) * df
     return call, put
 
 
@@ -358,7 +363,7 @@ def straddle_delta_usd(
         raise ValueError(f"sigma,tau must be positive, got sigma={sigma}, tau={tau_years}")
     sq = sigma * _sqrt(tau_years)
     fwd = spot * _exp(r * tau_years)
-    d1 = (_log_f(spot / fwd) + 0.5 * sigma * sigma * tau_years) / sq
+    d1 = (_log_f(fwd / strike) + 0.5 * sigma * sigma * tau_years) / sq
     return 2.0 * float(stats.norm.cdf(d1)) - 1.0
 
 
@@ -560,6 +565,85 @@ def _put_component(spot: float, strike: float, sigma: float, tau_years: float, r
     """Black-Scholes put price (helper for ledger settlement flow)."""
     _call, put = straddle_premium_usd(spot, strike, sigma, tau_years, r)
     return put
+
+
+class DeribitInversePricer:
+    """Computes exact USD P&L under BTC coin-margined settlement.
+
+    Provides a self-contained, stateless interface matching the Phase 0
+    specification.  All methods delegate to the module-level verified
+    functions; this class exists as a clean façade for pedagogical use and
+    for the user-specified ``test_inverse_pnl_reconciliation`` suite.
+
+    Deribit options payoff is settled in BTC::
+
+        Call payoff (BTC) = max(0, S_T - K) / S_T
+        Put payoff  (BTC) = max(0, K - S_T) / S_T
+
+    Converted to USD cash value at settlement (``P_usd = P_btc * S_T``)::
+
+        Call payoff (USD) = max(0, S_T - K)
+        Put payoff  (USD) = max(0, K - S_T)
+
+    Non-linearity emerges in the premium and margin::
+
+        Collateral P&L (USD) = Premium_BTC * S_T
+        Hedge P&L (USD) on inverse perp = Contracts * (S_T / S_0 - 1)
+    """
+
+    @staticmethod
+    def option_payoff_btc(is_call: bool, strike: float, spot_at_expiry: float) -> float:
+        """BTC-settled option intrinsic at expiry."""
+        otype: OptionType = "call" if is_call else "put"
+        return option_payoff_btc(otype, strike, spot_at_expiry)
+
+    @staticmethod
+    def inverse_perp_pnl_usd(
+        entry_spot: float, current_spot: float, contracts_usd: float
+    ) -> float:
+        """P&L in USD for Deribit inverse perpetual contracts.
+
+        ``PnL (BTC) = contracts_usd * (1/entry_spot - 1/current_spot)``
+        ``PnL (USD) = PnL (BTC) * current_spot``
+        """
+        return inverse_perp_pnl_usd(contracts_usd, entry_spot, current_spot)
+
+    @staticmethod
+    def straddle_pnl_usd(
+        strike: float,
+        premium_collected_btc: float,
+        spot_entry: float,
+        spot_exit: float,
+        delta_hedge_contracts_usd: float = 0.0,
+    ) -> dict[str, float]:
+        """Reconciles short straddle P&L including:
+
+        1. Short Call intrinsic payoff
+        2. Short Put intrinsic payoff
+        3. Collateral drift in USD (``Premium_BTC * spot_exit``)
+        4. Delta hedge P&L via inverse perpetual
+        """
+        call_loss_usd = max(0.0, spot_exit - strike)
+        put_loss_usd = max(0.0, strike - spot_exit)
+        total_liability_usd = call_loss_usd + put_loss_usd
+
+        # Value of the BTC premium received when converted to USD at exit
+        collateral_usd = premium_collected_btc * spot_exit
+
+        # Linear hedge P&L via inverse perp
+        hedge_usd = inverse_perp_pnl_usd(
+            delta_hedge_contracts_usd, spot_entry, spot_exit
+        )
+
+        net_pnl_usd = (collateral_usd - total_liability_usd) + hedge_usd
+
+        return {
+            "spot_exit": spot_exit,
+            "liability_usd": total_liability_usd,
+            "collateral_usd": collateral_usd,
+            "hedge_usd": hedge_usd,
+            "net_pnl_usd": net_pnl_usd,
+        }
 
 
 def _validate_index(price: float) -> None:

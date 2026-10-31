@@ -1,25 +1,25 @@
 [build-system]
-requires = ["setuptools>=69"]
+requires = ["setuptools>=70.0"]  # >=70.0.0 addresses CVE-2024-6345 (V-13/V-27)
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "quant-vrp"
+name = "quant-vvf"
 version = "0.1.0"
-description = "Falsification-first Volatility Risk Premium research & execution engine (Deribit BTC)"
+description = "Falsification-first Volatility Risk Premium research and execution engine (Deribit BTC)"
 requires-python = ">=3.11"
 dependencies = [
     "numpy>=2.0",
-    "pandas>=3.0",
+    "pandas>=2.2",
     "scipy>=1.14",
     "statsmodels>=0.14",
     "pyarrow>=14.0",
-    "pyyaml>=6.0",
-    "requests>=2.31",
+    "pyyaml>=6.0.2",
+    "requests>=2.32.3",  # >=2.32.3 addresses CVE-2024-35195 (V-13)
 ]
 
 [project.optional-dependencies]
 prod = ["nautilus-trader>=1.190"]
-dev = ["pytest>=7.4", "mypy>=1.8"]
+dev = ["pytest>=7.4", "mypy>=1.8", "QuantLib>=1.35"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -31,8 +31,12 @@ markers = [
 [tool.mypy]
 python_version = "3.11"
 strict = true
-files = ["libs/core/inverse_payoffs.py", "libs/data/canonical_store.py"]
+explicit_package_bases = true
 
 [[tool.mypy.overrides]]
-module = ["scipy.*", "pyarrow.*", "statsmodels.*", "nautilus_trader.*"]
+module = ["pandas.*", "scipy.*", "pyarrow.*", "statsmodels.*", "nautilus_trader.*", "QuantLib.*"]
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["execution.*"]
+disallow_subclassing_any = false

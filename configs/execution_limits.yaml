@@ -1,0 +1,17 @@
+# Execution Limits & Hard Risk Boundaries
+# Independent risk veto authority parameters.
+
+portfolio_limits:
+  max_portfolio_delta_abs: 0.15     # Neutral delta threshold triggering rebalance
+  max_portfolio_vega_btc: 50.0       # Global portfolio vega ceiling (in BTC units)
+  max_portfolio_gamma: 0.005         # Gamma boundary to prevent unhedgeable acceleration
+  max_margin_utilization: 0.70       # Cap initial margin at 70% of total equity
+  min_collateral_buffer_btc: 0.50    # Minimum unencumbered BTC balance
+
+execution_controls:
+  local_variance_circuit_breaker: 0.0025  # Microsecond tick variance limit (r^2 > 0.0025 halts execution)
+  continuous_delta_rebalance_trigger: 0.15 # Immediate hedge trigger when |Delta| > 0.15
+  min_dte_days: 2                         # Prohibit opening positions within 2 DTE (gamma risk)
+  max_dte_days: 35                        # Focus on near-term variance term structure
+  max_single_strike_pct: 0.35             # Maximum concentration in any single strike
+  max_slippage_bps: 25.0                  # Discard quotes if implied slippage exceeds 25 bps

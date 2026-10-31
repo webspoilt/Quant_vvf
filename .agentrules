@@ -1,0 +1,17 @@
+## Antigravity Autonomous Workflow Constraints
+
+### Commit Discipline:
+- NEVER create generic, truncated, or repetitive commit messages.
+- DO NOT commit intermediate or partial work. Only commit when a logical unit or test file passes completely.
+- STRICT FORMAT: `<type>(<scope>): <precise imperative description under 50 chars>`
+  - Types: `feat`, `fix`, `test`, `math`, `refactor`, `perf`, `chore`.
+  - Scopes: `(limits)`, `(solver)`, `(payoffs)`, `(store)`, `(triggers)`, `(actor)`, `(deps)`.
+  - Examples:
+    - `fix(limits): enforce fail-closed check on NaN inputs`
+    - `fix(solver): reject orders when margin budget is zero`
+    - `test(bias): add strict temporal receipt assertion`
+- BANNED PHRASES:
+  - "apply security audit hardening..."
+  - "add advanced mathematical..."
+  - "complete institutional vrp..."
+  - Any commit message matching a previously used commit message in the active session.

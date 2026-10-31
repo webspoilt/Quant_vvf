@@ -1,0 +1,43 @@
+# Pre-Registration Specification: Institutional VRP Engine (Deribit BTC)
+# Immutable parameters locked prior to out-of-sample testing to prevent data mining.
+
+hypothesis:
+  name: "Deribit BTC Tail-Conditioned Volatility Risk Premium"
+  description: >
+    Deribit BTC options exhibit a structural volatility risk premium (IV > RV)
+    driven by demand for tail crash protection. Systematically harvesting this
+    premium via delta-hedged short straddles produces positive net risk-adjusted
+    returns after Deribit fees and execution slippage, provided the book is
+    conditioned on deterministic non-parametric tail triggers.
+
+# Phase 3 Pre-Registered Tail Triggers (Strict Veto Authority)
+tail_triggers:
+  rv_shock:
+    multiplier: 3.0
+    baseline_window_days: 30
+    description: "Current 24h Realized Volatility > 3.0x 30-day baseline"
+  skew_spike:
+    percentile: 0.95
+    lookback_days: 90
+    delta_reference: 0.25
+    description: "25-delta Put/Call IV Skew > 95th percentile of rolling 90d window"
+  funding_rate:
+    z_score_threshold: 2.5
+    lookback_periods: 84  # 28 days of 8-hour funding rate snapshots
+    description: "Deribit BTC Perpetual funding rate z-score > 2.5"
+
+# Multiple Testing & Trial Budget (Bailey & Lopez de Prado 2014)
+multiple_testing:
+  trial_budget_n: 3
+  family_wise_error_rate: 0.05
+  min_acceptable_deflated_sharpe: 0.95
+
+# Baseline Strategy Parameters
+strategy:
+  target_dte_days: 14
+  rebalance_frequency_hours: 4
+  delta_tolerance: 0.15
+  options_taker_fee_rate: 0.0003  # 0.03% of underlying contract
+  options_fee_cap_pct: 0.125       # 12.5% of option premium
+  perp_taker_fee_rate: 0.0005     # 0.05% of notional
+  spread_crossing_fraction: 1.0   # Pay full half-spread upon entry/rebalance

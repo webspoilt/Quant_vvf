@@ -9,3 +9,36 @@ data/processed/*.meta.json
 *.egg-info/
 dist/
 build/
+
+# Environment & Secrets (V-09): never commit credentials or key material
+.env
+.env.*
+*.env
+*.pem
+*.key
+*.pfx
+*.p12
+secrets.yaml
+secrets.json
+credentials.json
+
+# Virtual Environments
+venv/
+.venv/
+env/
+
+# Coverage & Testing
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+
+# Logs & Runtime
+*.log
+logs/
+
+# IDE & OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
