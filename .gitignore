@@ -37,8 +37,9 @@ htmlcov/
 *.log
 logs/
 
-# IDE & OS
+# IDE & OS & Agent Local State
 .vscode/
 .idea/
 .DS_Store
 Thumbs.db
+.antigravity/

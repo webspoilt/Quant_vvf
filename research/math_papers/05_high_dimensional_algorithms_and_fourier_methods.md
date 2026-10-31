@@ -70,7 +70,7 @@ $$
 ### 2.2 The Key Analytical Connection
 Because $\cos(\theta) = \text{Re}(e^{i\theta})$, the coefficients $A_k$ are directly extracted from the **characteristic function** $\phi(u)$ without numerical integration:
 $$
-A_k \approx \frac{2}{b - a} \text{Re}\left\{ \phi\left( \frac{k\pi}{b - a} \right) \exp\left( -i \frac{k\pi a}{b - a} \right) \right\}
+A_k \approx \frac{2}{b - a} \mathrm{Re}\left[ \phi\left( \frac{k\pi}{b - a} \right) \exp\left( -i \frac{k\pi a}{b - a} \right) \right]
 $$
 
 ### 2.3 Option Pricing Formula

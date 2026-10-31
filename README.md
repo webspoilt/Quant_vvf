@@ -232,7 +232,7 @@ V(x, t_0) = e^{-r \tau} K \sum_{k=0}^{N-1} {}' A_k \cdot U_k
 $$
 
 $$
-A_k = \frac{2}{b - a} \text{Re}\left\{ \phi\left( \frac{k\pi}{b - a} \right) \exp\left( -i \frac{k\pi a}{b - a} \right) \right\}
+A_k = \frac{2}{b - a} \mathrm{Re}\left[ \phi\left( \frac{k\pi}{b - a} \right) \exp\left( -i \frac{k\pi a}{b - a} \right) \right]
 $$
 
 * **Carr-Madan (1999) FFT:** Evaluates European option prices across a full continuum of strikes in $\mathcal{O}(N \log N)$ operations using damped characteristic function inversion with optimal damping parameter $\alpha > 0$.
@@ -295,112 +295,115 @@ flowchart TD
 
 The benchmark stochastic optimal control formulation for electronic liquidity provision (Avellaneda & Stoikov, 2008).
 
-* **Core Problem:** How to continuously quote bid and ask limit prices ($r^b, r^a$) to capture the bid-ask spread while preventing toxic inventory accumulation when prices drift adversely.
-* **Asset and Inventory Dynamics:**
-  Let mid-price $S_t$ evolve as an arithmetic Brownian motion on finite horizon $[0, T]$:
+##### Core Problem
+How to continuously quote bid and ask limit prices ($r^b, r^a$) to capture the bid-ask spread while preventing toxic inventory accumulation when prices drift adversely.
+
+##### Asset and Inventory Dynamics
+Let mid-price $S_t$ evolve as an arithmetic Brownian motion on finite horizon $[0, T]$:
 
 $$
 dS_t = \sigma \, dW_t
 $$
 
-  where $\sigma > 0$ is instantaneous price volatility and $W_t$ is a standard 1D Brownian motion.
-  The market maker quotes bid distance $\delta_t^b = S_t - r_t^b$ and ask distance $\delta_t^a = r_t^a - S_t$.
-  Order execution arrivals occur according to independent point processes $N_t^a, N_t^b$ with Poisson intensities decreasing exponentially in spread:
+where $\sigma > 0$ is instantaneous price volatility and $W_t$ is a standard 1D Brownian motion.
+The market maker quotes bid distance $\delta_t^b = S_t - r_t^b$ and ask distance $\delta_t^a = r_t^a - S_t$.
+Order execution arrivals occur according to independent point processes $N_t^a, N_t^b$ with Poisson intensities decreasing exponentially in spread:
 
 $$
 \lambda^a(\delta_t^a) = A e^{-k \delta_t^a}, \quad \lambda^b(\delta_t^b) = A e^{-k \delta_t^b} \quad (A, k > 0)
 $$
 
-  Cash $X_t$ and inventory $q_t$ evolve as jump processes:
+Cash $X_t$ and inventory $q_t$ evolve as jump processes:
 
 $$
 dX_t = (S_t + \delta_t^a) \, dN_t^a - (S_t - \delta_t^b) \, dN_t^b, \quad dq_t = dN_t^b - dN_t^a
 $$
 
-* **Value Function & Hamilton-Jacobi-Bellman (HJB) Formulation:**
-  The market maker maximizes expected terminal utility of wealth under Constant Absolute Risk Aversion (CARA):
+##### Value Function & Hamilton-Jacobi-Bellman (HJB) Formulation
+The market maker maximizes expected terminal utility of wealth under Constant Absolute Risk Aversion (CARA):
 
 $$
 U(W_T) = -\exp(-\gamma W_T) = -\exp\left(-\gamma \left(X_T + q_T S_T\right)\right)
 $$
 
-  where $\gamma > 0$ is the trader's risk aversion. The value function is defined as:
+where $\gamma > 0$ is the trader's risk aversion. The value function is defined as:
 
 $$
 V(x, q, s, t) = \sup_{(\delta^a, \delta^b) \in \mathcal{A}} \mathbb{E}_t\left[ -\exp\left(-\gamma \left(X_T + q_T S_T\right)\right) \right]
 $$
 
-  By dynamic programming, $V(x, q, s, t)$ satisfies the HJB equation:
+By dynamic programming, $V(x, q, s, t)$ satisfies the HJB equation:
 
 $$
 \partial_t V + \frac{1}{2}\sigma^2 \partial_{ss} V + \max_{\delta^a} \lambda^a(\delta^a) \left[ V(x + s + \delta^a, q - 1, s, t) - V(x, q, s, t) \right] + \max_{\delta^b} \lambda^b(\delta^b) \left[ V(x - s + \delta^b, q + 1, s, t) - V(x, q, s, t) \right] = 0
 $$
 
-  with terminal boundary condition $V(x, q, s, T) = -\exp(-\gamma(x + q s))$.
+with terminal boundary condition $V(x, q, s, T) = -\exp(-\gamma(x + q s))$.
 
-* **Mathematical Derivation of the Indifference Reservation Price $r(s, q, t)$:**
-  The reservation price $r(s, q, t)$ is defined as the exact cash value at which the market maker is indifferent between holding current inventory $q$ and liquidating immediately to inventory $0$:
+##### Mathematical Derivation of the Indifference Reservation Price
+The reservation price $r(s, q, t)$ is defined as the exact cash value at which the market maker is indifferent between holding current inventory $q$ and liquidating immediately to inventory $0$:
 
 $$
 V(x + r(s, q, t), 0, s, t) = V(x, q, s, t)
 $$
 
-  Under CARA utility, wealth factors multiplicatively: $V(x, q, s, t) = -\exp(-\gamma x) \exp(-\gamma \theta(s, q, t))$. Substituting gives:
+Under CARA utility, wealth factors multiplicatively: $V(x, q, s, t) = -\exp(-\gamma x) \exp(-\gamma \theta(s, q, t))$. Substituting gives:
 
 $$
 -\exp\left(-\gamma (x + r(s, q, t))\right) \exp\left(-\gamma \theta(s, 0, t)\right) = -\exp(-\gamma x) \exp\left(-\gamma \theta(s, q, t)\right)
 $$
 
-  Taking logarithms and canceling $-\gamma$:
+Taking logarithms and canceling $-\gamma$:
 
 $$
 r(s, q, t) = \theta(s, q, t) - \theta(s, 0, t)
 $$
 
-  For terminal inventory without subsequent trades, $S_T \sim \mathcal{N}(s, \sigma^2(T - t))$. The certainty equivalent of terminal inventory value $q S_T$ is:
+For terminal inventory without subsequent trades, $S_T \sim \mathcal{N}(s, \sigma^2(T - t))$. The certainty equivalent of terminal inventory value $q S_T$ is:
 
 $$
 \mathbb{E}_t\left[ -\exp(-\gamma q S_T) \right] = -\exp\left( -\gamma q s + \frac{1}{2} \gamma^2 q^2 \sigma^2 (T - t) \right)
 $$
 
-  Equating this to $-\exp(-\gamma q \cdot r(s, q, t))$:
+Equating this to $-\exp(-\gamma q \cdot r(s, q, t))$:
 
 $$
 -\gamma q \cdot r(s, q, t) = -\gamma q s + \frac{1}{2} \gamma^2 q^2 \sigma^2 (T - t)
 $$
 
-  Dividing both sides by $-\gamma q$ ($q \ne 0$) yields the exact closed-form **reservation price**:
+Dividing both sides by $-\gamma q$ ($q \ne 0$) yields the exact closed-form **reservation price**:
 
 $$
 \boxed{r(s, q, t) = s - q \gamma \sigma^2 (T - t)}
 $$
 
-  *(where $s$ is mid-price, $q$ is current inventory, $\gamma$ is risk aversion, and $\sigma$ is volatility)*.
+*(where $s$ is mid-price, $q$ is current inventory, $\gamma$ is risk aversion, and $\sigma$ is volatility)*.
 
-* **Solving the First-Order Conditions (FOC) for Optimal Quotes $\delta^a, \delta^b$:**
-  Differentiating the Hamiltonian inside the HJB equation with respect to $\delta^a$:
+##### Solving the First-Order Conditions (FOC) for Optimal Quotes
+
+Differentiating the Hamiltonian inside the HJB equation with respect to $\delta^a$:
 
 $$
-\frac{\partial}{\partial \delta^a} \left\{ A e^{-k \delta^a} \left[ 1 - \exp\left( -\gamma(s + \delta^a - r(s, q, t)) \right) \right] \right\} = 0
+\frac{\partial}{\partial \delta^a} \left[ A e^{-k \delta^a} \left( 1 - \exp\left( -\gamma(s + \delta^a - r(s, q, t)) \right) \right) \right] = 0
 $$
 
 $$
 -k A e^{-k \delta^a} \left[ 1 - e^{-\gamma(s + \delta^a - r(s, q, t))} \right] + A e^{-k \delta^a} \left[ \gamma e^{-\gamma(s + \delta^a - r(s, q, t))} \right] = 0
 $$
 
-  Dividing by $A e^{-k \delta^a}$:
+Dividing by $A e^{-k \delta^a}$:
 
 $$
 -k + (k + \gamma) e^{-\gamma(s + \delta^a - r(s, q, t))} = 0 \implies e^{-\gamma(s + \delta^a - r(s, q, t))} = \frac{k}{k + \gamma} = \frac{1}{1 + \frac{\gamma}{k}}
 $$
 
-  Taking natural logarithms:
+Taking natural logarithms:
 
 $$
 -\gamma(s + \delta^a - r(s, q, t)) = -\ln\left(1 + \frac{\gamma}{k}\right) \implies s + \delta^a - r(s, q, t) = \frac{1}{\gamma} \ln\left(1 + \frac{\gamma}{k}\right)
 $$
 
-  Solving for $\delta^a$ and applying symmetric derivation for $\delta^b$:
+Solving for $\delta^a$ and applying symmetric derivation for $\delta^b$:
 
 $$
 \boxed{\delta^a(s, q, t) = r(s, q, t) - s + \frac{1}{\gamma} \ln\left(1 + \frac{\gamma}{k}\right) = -q \gamma \sigma^2 (T - t) + \frac{1}{\gamma} \ln\left(1 + \frac{\gamma}{k}\right)}
@@ -410,29 +413,29 @@ $$
 \boxed{\delta^b(s, q, t) = s - r(s, q, t) + \frac{1}{\gamma} \ln\left(1 + \frac{\gamma}{k}\right) = +q \gamma \sigma^2 (T - t) + \frac{1}{\gamma} \ln\left(1 + \frac{\gamma}{k}\right)}
 $$
 
-  The total optimal bid-ask spread is independent of inventory:
+The total optimal bid-ask spread is independent of inventory:
 
 $$
-\boxed{s_{\text{spread}}^* = \delta^a + \delta^b = \frac{2}{\gamma} \ln\left(1 + \frac{\gamma}{k}\right)}
+\boxed{S^{\star} = \delta^a + \delta^b = \frac{2}{\gamma} \ln\left(1 + \frac{\gamma}{k}\right)}
 $$
 
-  and optimal absolute limit order quotes are placed symmetrically around the reservation price:
+and optimal absolute limit order quotes are placed symmetrically around the reservation price:
 
 $$
-r^a(s, q, t) = r(s, q, t) + \frac{1}{2} s_{\text{spread}}^*, \quad r^b(s, q, t) = r(s, q, t) - \frac{1}{2} s_{\text{spread}}^*
+r^a(s, q, t) = r(s, q, t) + \frac{1}{2} S^{\star}, \quad r^b(s, q, t) = r(s, q, t) - \frac{1}{2} S^{\star}
 $$
 
-* **Key Role & Inventory Control:**
+##### Key Role & Inventory Control
   When long inventory ($q > 0$), the reservation price shifts downward below mid-price ($r < s$). Consequently, $\delta^a$ decreases (the ask is quoted closer to the mid-price, increasing fill probability to offload inventory) while $\delta^b$ increases (the bid moves deeper into the book, deterring additional purchases).
 
 ---
 
 #### B. Microstructure Alpha & Order Flow Imbalance (OFI)
 
-* **Order Flow Imbalance (OFI) & Trade Imbalance:**
-  Rather than relying on lagging time-aggregated candles, modern HFT tracks tick-by-tick Level 1 limit order book (LOB) state transitions.
-  Let $b_n$ be the best bid, $q_n^b$ the best bid size, $a_n$ the best ask, and $q_n^a$ the best ask size at discrete event $n$.
-  The net change in volume at the best bid ($\Delta W_n^b$) and ask ($\Delta W_n^a$) across consecutive book updates is:
+##### Order Flow Imbalance (OFI) & Trade Imbalance
+Rather than relying on lagging time-aggregated candles, modern HFT tracks tick-by-tick Level 1 limit order book (LOB) state transitions.
+Let $b_n$ be the best bid, $q_n^b$ the best bid size, $a_n$ the best ask, and $q_n^a$ the best ask size at discrete event $n$.
+The net change in volume at the best bid ($\Delta W_n^b$) and ask ($\Delta W_n^a$) across consecutive book updates is:
 
 $$
 \Delta W_n^b = \begin{cases} q_n^b & \text{if } b_n > b_{n-1} \\ q_n^b - q_{n-1}^b & \text{if } b_n = b_{n-1} \\ -q_{n-1}^b & \text{if } b_n < b_{n-1} \end{cases}
@@ -442,103 +445,106 @@ $$
 \Delta W_n^a = \begin{cases} -q_{n-1}^a & \text{if } a_n > a_{n-1} \\ q_n^a - q_{n-1}^a & \text{if } a_n = a_{n-1} \\ q_n^a & \text{if } a_n < a_{n-1} \end{cases}
 $$
 
-  Order Flow Imbalance (OFI) is defined as the net order flow driving price pressure:
+Order Flow Imbalance (OFI) is defined as the net order flow driving price pressure:
 
 $$
 \boxed{\text{OFI}_n = \Delta W_n^b - \Delta W_n^a}
 $$
 
-  **Linear Price Impact Theorem (Cont, Kukanov & Stoikov, 2014):**
-  Short-term price changes $\Delta P_n = P_n - P_{n-1}$ satisfy the econometric relation:
+**Linear Price Impact Theorem (Cont, Kukanov & Stoikov, 2014):**
+Short-term price changes $\Delta P_n = P_n - P_{n-1}$ satisfy the econometric relation:
 
 $$
 \Delta P_n = \beta \, \text{OFI}_n + \epsilon_n, \quad \beta = \frac{1}{2 \bar{D}}
 $$
 
-  where $\bar{D} = \frac{1}{2}(q^b + q^a)$ is the average prevailing order book queue depth. Positive OFI creates immediate upward price drift; negative OFI predicts downward price decay.
+where $\bar{D} = \frac{1}{2}(q^b + q^a)$ is the average prevailing order book queue depth. Positive OFI creates immediate upward price drift; negative OFI predicts downward price decay.
 
-* **Volume Synchronized Probability of Toxicity (VPIN):**
-  VPIN (Easley, López de Prado & O'Hara, 2012) replaces physical calendar time with a continuous **volume clock**, partitioning trades into equal volume buckets of constant size $V$ (e.g., $V = \frac{1}{50} \text{ADV}$).
-  Each bucket contains buy volume $V_\tau^B$ and sell volume $V_\tau^S$ such that $V_\tau^B + V_\tau^S = V$.
-  Order flow toxicity over a rolling window of $N$ volume buckets is:
+##### Volume Synchronized Probability of Toxicity (VPIN)
+VPIN (Easley, López de Prado & O'Hara, 2012) replaces physical calendar time with a continuous **volume clock**, partitioning trades into equal volume buckets of constant size $V$ (e.g., $V = \frac{1}{50} \text{ADV}$).
+Each bucket contains buy volume $V_\tau^B$ and sell volume $V_\tau^S$ such that $V_\tau^B + V_\tau^S = V$.
+Order flow toxicity over a rolling window of $N$ volume buckets is:
 
 $$
 \boxed{\text{VPIN} = \frac{\sum_{\tau=1}^N |V_\tau^B - V_\tau^S|}{N \cdot V}}
 $$
 
-  In high-frequency regimes without explicit trade aggressor flags, signed buy/sell volume is inferred using the **Bulk Volume Classification (BVC)** algorithm:
+In high-frequency regimes without explicit trade aggressor flags, signed buy/sell volume is inferred using the **Bulk Volume Classification (BVC)** algorithm:
 
 $$
 V_\tau^B = V \cdot \Phi\left( \frac{\Delta P_\tau}{\sigma_{\Delta P}} \right), \quad V_\tau^S = V \cdot \left[ 1 - \Phi\left( \frac{\Delta P_\tau}{\sigma_{\Delta P}} \right) \right]
 $$
 
-  where $\Phi(\cdot)$ is the standard normal cumulative distribution function and $\sigma_{\Delta P}$ is the standard deviation of bucket price increments. Substituting into VPIN yields:
+where $\Phi(\cdot)$ is the standard normal cumulative distribution function and $\sigma_{\Delta P}$ is the standard deviation of bucket price increments. Substituting into VPIN yields:
 
 $$
 \boxed{\text{VPIN} = \frac{1}{N} \sum_{\tau=1}^N \left| 2 \Phi\left( \frac{\Delta P_\tau}{\sigma_{\Delta P}} \right) - 1 \right|}
 $$
 
-  When $\text{VPIN} \to 1$, toxic informed order flow dominates; market-making algorithms immediately widen quoting spreads or pull quotes to avoid adverse selection.
+When $\text{VPIN} \to 1$, toxic informed order flow dominates; market-making algorithms immediately widen quoting spreads or pull quotes to avoid adverse selection.
 
 ---
 
 #### C. Cross-Asset & Cross-Venue Latency Arbitrage
 
-* **Mechanism:** Exploits deterministic price discrepancies between highly correlated instruments (ETF vs. underlying equity basket, E-mini S&P futures vs. SPY, or identical crypto options/perps across Deribit, Binance, and CME).
-* **Parity Enforcement:** For an ETF basket with weights $w_i$:
+##### Mechanism & Arbitrage Bounds
+Exploits deterministic price discrepancies between highly correlated instruments (ETF vs. underlying equity basket, E-mini S&P futures vs. SPY, or identical crypto options/perps across Deribit, Binance, and CME).
+For an ETF basket with weights $w_i$:
 
 $$
 \Pi_{\text{arb}} = P_{\text{ETF}} - \sum_{i=1}^M w_i P_i - \text{TakerFees} - \text{Slippage} > 0
 $$
 
-* **Speed Dynamic:** Pure race-to-the-exchange logic. Algorithms react to a fill or price change on Venue A by sweeping resting liquidity on Venue B within microseconds before Venue B's local participants can cancel stale quotes.
+##### Speed Dynamic & Execution Race
+Pure race-to-the-exchange logic. Algorithms react to a fill or price change on Venue A by sweeping resting liquidity on Venue B within microseconds before Venue B's local participants can cancel stale quotes.
 
 ---
 
 #### D. Short-Horizon Statistical Arbitrage
 
-* **Lead-Lag Models:** Evaluates rolling cross-correlation matrices and Granger causality at millisecond intervals to detect leading price changes in liquid futures that predict subsequent follow-through in slower spot instruments:
+##### Lead-Lag Models
+Evaluates rolling cross-correlation matrices and Granger causality at millisecond intervals to detect leading price changes in liquid futures that predict subsequent follow-through in slower spot instruments:
 
 $$
 \rho_{XY}(\tau) = \frac{\mathbb{E}\left[ (X_t - \mu_X)(Y_{t+\tau} - \mu_Y) \right]}{\sigma_X \sigma_Y}
 $$
 
-  The peak argument $\tau^* = \arg\max_\tau \rho_{XY}(\tau) > 0$ defines the deterministic latency window for order placement.
+The peak argument $\tau^{\star} = \arg\max_\tau \rho_{XY}(\tau) > 0$ defines the deterministic latency window for order placement.
 
-* **Ornstein–Uhlenbeck (OU) Mean Reversion:**
-  Micro-pairs price spread $X_t = \ln(S_1(t)) - \beta \ln(S_2(t))$ evolves as an Ornstein-Uhlenbeck mean-reverting process:
+##### Ornstein–Uhlenbeck (OU) Mean Reversion
+Micro-pairs price spread $X_t = \ln(S_1(t)) - \beta \ln(S_2(t))$ evolves as an Ornstein-Uhlenbeck mean-reverting process:
 
 $$
 dX_t = \theta (\mu - X_t) \, dt + \sigma \, dW_t \quad (\theta > 0, \, \sigma > 0)
 $$
 
-  **Analytical Solution via Integrating Factor:**
-  Multiply both sides by the integrating factor $e^{\theta t}$:
+**Analytical Solution via Integrating Factor:**
+Multiply both sides by the integrating factor $e^{\theta t}$:
 
 $$
 e^{\theta t} dX_t + \theta e^{\theta t} X_t \, dt = \theta \mu e^{\theta t} \, dt + \sigma e^{\theta t} \, dW_t
 $$
 
-  Recognizing the left side as the total differential $d\left(e^{\theta t} X_t\right)$:
+Recognizing the left side as the total differential $d\left(e^{\theta t} X_t\right)$:
 
 $$
 d\left(e^{\theta t} X_t\right) = \theta \mu e^{\theta t} \, dt + \sigma e^{\theta t} \, dW_t
 $$
 
-  Integrate both sides from $0$ to $t$:
+Integrate both sides from $0$ to $t$:
 
 $$
 e^{\theta t} X_t - X_0 = \mu \left( e^{\theta t} - 1 \right) + \sigma \int_0^t e^{\theta s} \, dW_s
 $$
 
-  Multiply through by $e^{-\theta t}$ to obtain the exact pathwise solution:
+Multiply through by $e^{-\theta t}$ to obtain the exact pathwise solution:
 
 $$
 \boxed{X_t = \mu + (X_0 - \mu) e^{-\theta t} + \sigma \int_0^t e^{-\theta(t - s)} \, dW_s}
 $$
 
-  **Moments and Asymptotics:**
-  The conditional expectation and variance are:
+**Moments and Asymptotics:**
+The conditional expectation and variance are:
 
 $$
 \mathbb{E}[X_t \mid X_0] = \mu + (X_0 - \mu) e^{-\theta t}
@@ -548,14 +554,14 @@ $$
 \text{Var}(X_t \mid X_0) = \sigma^2 \int_0^t e^{-2\theta(t - s)} \, ds = \frac{\sigma^2}{2\theta} \left( 1 - e^{-2\theta t} \right)
 $$
 
-  As $t \to \infty$, the stationary distribution is Gaussian: $X_\infty \sim \mathcal{N}\left(\mu, \frac{\sigma^2}{2\theta}\right)$.
-  The **half-life of mean reversion** $t_{1/2}$ is derived from $\mathbb{E}[X_{t_{1/2}} - \mu] = \frac{1}{2}(X_0 - \mu)$:
+As $t \to \infty$, the stationary distribution is Gaussian: $X_\infty \sim \mathcal{N}\left(\mu, \frac{\sigma^2}{2\theta}\right)$.
+The **half-life of mean reversion** $t_{1/2}$ is derived from $\mathbb{E}[X_{t_{1/2}} - \mu] = \frac{1}{2}(X_0 - \mu)$:
 
 $$
 e^{-\theta t_{1/2}} = \frac{1}{2} \implies \boxed{t_{1/2} = \frac{\ln 2}{\theta}}
 $$
 
-  For discrete calibration over sampling step $\Delta t$, the process maps to an exact AR(1) specification:
+For discrete calibration over sampling step $\Delta t$, the process maps to an exact AR(1) specification:
 
 $$
 X_k = a + b X_{k-1} + \epsilon_k, \quad b = e^{-\theta \Delta t}, \quad a = \mu(1 - b), \quad \text{Var}(\epsilon) = \frac{\sigma^2}{2\theta}(1 - b^2)
@@ -569,26 +575,28 @@ $$
 
 The foundational mathematical framework for minimizing transaction costs when liquidating large institutional positions (Almgren & Chriss, 2000).
 
-* **Core Problem:** Trade-off between **market impact** (trading fast moves the price against you) and **volatility risk** (trading slow exposes the inventory to adverse macro price variance).
-* **Model Setup & Price Impact Dynamics:**
-  A trader must liquidate an initial position of $X_0$ contracts over finite horizon $T$, divided into $N$ trading intervals $t_k = k \tau$ with step size $\tau = T / N$.
-  Let $x_k$ be shares remaining at time $t_k$ ($x_0 = X_0, x_N = 0$). The trading rate is $v_k = (x_{k-1} - x_k) / \tau$.
-  Mid-price $S_k$ evolves under permanent impact parameter $\gamma_I$ and volatility $\sigma$:
+##### Core Problem
+Trade-off between **market impact** (trading fast moves the price against you) and **volatility risk** (trading slow exposes the inventory to adverse macro price variance).
+
+##### Model Setup & Price Impact Dynamics
+A trader must liquidate an initial position of $X_0$ contracts over finite horizon $T$, divided into $N$ trading intervals $t_k = k \tau$ with step size $\tau = T / N$.
+Let $x_k$ be shares remaining at time $t_k$ ($x_0 = X_0, x_N = 0$). The trading rate is $v_k = (x_{k-1} - x_k) / \tau$.
+Mid-price $S_k$ evolves under permanent impact parameter $\gamma_I$ and volatility $\sigma$:
 
 $$
 S_k = S_{k-1} + \sigma \tau^{1/2} \xi_k - \tau \gamma_I v_k = S_0 + \sigma \sum_{j=1}^k \tau^{1/2} \xi_j - \gamma_I (X_0 - x_k)
 $$
 
-  where $\xi_k \sim \text{i.i.d.} \, \mathcal{N}(0, 1)$.
-  The realized execution price $\tilde{S}_k$ incorporates temporary market impact parameter $\eta$:
+where $\xi_k \sim \text{i.i.d.} \, \mathcal{N}(0, 1)$.
+The realized execution price $\tilde{S}_k$ incorporates temporary market impact parameter $\eta$:
 
 $$
 \tilde{S}_k = S_k - \eta v_k
 $$
 
-* **Expected Shortfall and Variance:**
-  Total capture is $\sum_{k=1}^N \tau v_k \tilde{S}_k$. The implementation shortfall $x$ is total cash received relative to initial book value $X_0 S_0$.
-  The expectation and variance of shortfall are:
+##### Expected Shortfall and Variance
+Total capture is $\sum_{k=1}^N \tau v_k \tilde{S}_k$. The implementation shortfall $x$ is total cash received relative to initial book value $X_0 S_0$.
+The expectation and variance of shortfall are:
 
 $$
 \mathbb{E}[x] = \frac{1}{2} \gamma_I X_0^2 + \eta \sum_{k=1}^N \tau v_k^2 = \frac{1}{2}\gamma_I X_0^2 + \frac{\eta}{\tau} \sum_{k=1}^N (x_{k-1} - x_k)^2
@@ -598,103 +606,107 @@ $$
 V[x] = \sigma^2 \sum_{k=1}^N \tau x_k^2
 $$
 
-* **Continuous-Time Calculus of Variations Derivation:**
-  In continuous time ($N \to \infty$), the trader minimizes the mean-variance utility functional with risk aversion $\lambda_R > 0$:
+##### Continuous-Time Calculus of Variations Derivation
+In continuous time ($N \to \infty$), the trader minimizes the mean-variance utility functional with risk aversion $\lambda_R > 0$:
 
 $$
 J[x] = \mathbb{E}[x] + \lambda_R V[x] = \frac{1}{2}\gamma_I X_0^2 + \int_0^T \left( \eta \dot{x}(t)^2 + \lambda_R \sigma^2 x(t)^2 \right) dt
 $$
 
-  Define the Lagrangian action density:
+Define the Lagrangian action density:
 
 $$
 \mathcal{L}(t, x, \dot{x}) = \eta \dot{x}(t)^2 + \lambda_R \sigma^2 x(t)^2
 $$
 
-  By the Euler-Lagrange theorem:
+By the Euler-Lagrange theorem:
 
 $$
 \frac{\partial \mathcal{L}}{\partial x} - \frac{d}{dt} \left( \frac{\partial \mathcal{L}}{\partial \dot{x}} \right) = 0
 $$
 
-  Computing the partial derivatives:
+Computing the partial derivatives:
 
 $$
 \frac{\partial \mathcal{L}}{\partial x} = 2 \lambda_R \sigma^2 x(t), \quad \frac{\partial \mathcal{L}}{\partial \dot{x}} = 2 \eta \dot{x}(t), \quad \frac{d}{dt}\left( \frac{\partial \mathcal{L}}{\partial \dot{x}} \right) = 2 \eta \ddot{x}(t)
 $$
 
-  Substituting into the Euler-Lagrange equation:
+Substituting into the Euler-Lagrange equation:
 
 $$
 2 \lambda_R \sigma^2 x(t) - 2 \eta \ddot{x}(t) = 0 \implies \ddot{x}(t) - \frac{\lambda_R \sigma^2}{\eta} x(t) = 0
 $$
 
-  Define the urgency parameter:
+Define the urgency parameter:
 
 $$
 \kappa = \sqrt{\frac{\lambda_R \sigma^2}{\eta}}
 $$
 
-  The second-order ordinary differential equation (ODE) becomes:
+The second-order ordinary differential equation (ODE) becomes:
 
 $$
-\boxed{\ddot{x}(t) - \kappa^2 x(t) = 0}
+\boxed{ddot{x}(t) - \kappa^2 x(t) = 0}
 $$
 
-* **Exact Solution via Hyperbolic Trigonometric Functions:**
-  The characteristic equation is $r^2 - \kappa^2 = 0 \implies r = \pm \kappa$.
-  The general solution is:
+##### Exact Solution via Hyperbolic Trigonometric Functions
+The characteristic equation is $r^2 - \kappa^2 = 0 \implies r = \pm \kappa$.
+The general solution is:
 
 $$
 x(t) = C_1 \cosh(\kappa(T - t)) + C_2 \sinh(\kappa(T - t))
 $$
 
-  Apply boundary conditions $x(0) = X_0$ and $x(T) = 0$:
-  1. At $t = T$: $x(T) = C_1 \cosh(0) + C_2 \sinh(0) = C_1 \cdot 1 + 0 = 0 \implies C_1 = 0$.
-  2. At $t = 0$: $x(0) = C_2 \sinh(\kappa T) = X_0 \implies C_2 = \frac{X_0}{\sinh(\kappa T)}$.
+Apply boundary conditions $x(0) = X_0$ and $x(T) = 0$:
+1. At $t = T$: $x(T) = C_1 \cosh(0) + C_2 \sinh(0) = C_1 \cdot 1 + 0 = 0 \implies C_1 = 0$.
+2. At $t = 0$: $x(0) = C_2 \sinh(\kappa T) = X_0 \implies C_2 = \frac{X_0}{\sinh(\kappa T)}$.
 
-  Substituting $C_1$ and $C_2$ gives the unique **optimal inventory trajectory**:
+Substituting $C_1$ and $C_2$ gives the unique **optimal inventory trajectory**:
 
 $$
 \boxed{x(t) = X_0 \frac{\sinh(\kappa(T - t))}{\sinh(\kappa T)}}
 $$
 
-  The **optimal liquidation velocity** $v(t) = -\dot{x}(t)$ is:
+The **optimal liquidation velocity** $v(t) = -\dot{x}(t)$ is:
 
 $$
 \boxed{v(t) = X_0 \kappa \frac{\cosh(\kappa(T - t))}{\sinh(\kappa T)}}
 $$
 
-* **Limiting Asymptotic Regimes:**
-  1. **Risk-Neutral Limit ($\lambda_R \to 0 \implies \kappa \to 0$):**
-     By L'Hôpital's rule:
+##### Limiting Asymptotic Regimes
+1. **Risk-Neutral Limit ($\lambda_R \to 0 \implies \kappa \to 0$):**
+   By L'Hôpital's rule:
 
 $$
 \lim_{\kappa \to 0} \frac{\sinh(\kappa(T - t))}{\sinh(\kappa T)} = \lim_{\kappa \to 0} \frac{(T - t) \cosh(\kappa(T - t))}{T \cosh(\kappa T)} = \frac{T - t}{T} = 1 - \frac{t}{T}
 $$
 
-     recovering the constant-rate linear TWAP liquidation trajectory.
-  2. **Extreme Risk Aversion ($\lambda_R \to \infty \implies \kappa \to \infty$):**
-     The trajectory contracts to an instantaneous block liquidation at $t = 0$ to eliminate variance risk.
+   recovering the constant-rate linear TWAP liquidation trajectory.
+2. **Extreme Risk Aversion ($\lambda_R \to \infty \implies \kappa \to \infty$):**
+   The trajectory contracts to an instantaneous block liquidation at $t = 0$ to eliminate variance risk.
 
 ---
 
 #### B. Adaptive VWAP / TWAP
 
-* **Dynamic Volume Profile Tracking:** Rather than static time slicing, adaptive execution engines track the intraday cumulative volume distribution curve $F(t) = \int_0^t v_{\text{hist}}(s) ds / \text{ADV}$.
-* **Anti-Gaming Child Order Slicing:** To prevent predatory HFT algorithms from detecting algorithmic execution footprints, child orders randomize trade sizes $\tilde{v}_k \sim \mathcal{U}(v_k(1 - \epsilon), v_k(1 + \epsilon))$ and draw inter-arrival intervals from Poisson distributions $\tau_k \sim \text{Exp}(\lambda_k)$.
+##### Dynamic Volume Profile Tracking
+Rather than static time slicing, adaptive execution engines track the intraday cumulative volume distribution curve $F(t) = \int_0^t v_{\text{hist}}(s) ds / \text{ADV}$.
+
+##### Anti-Gaming Child Order Slicing
+To prevent predatory HFT algorithms from detecting algorithmic execution footprints, child orders randomize trade sizes $\tilde{v}_k \sim \mathcal{U}(v_k(1 - \epsilon), v_k(1 + \epsilon))$ and draw inter-arrival intervals from Poisson distributions $\tau_k \sim \text{Exp}(\lambda_k)$.
 
 ---
 
 #### C. Smart Order Routing (SOR)
 
-* **Graph-Based Multi-Venue Dispatch:** Slices parent orders across fragmented lit exchanges, dark pools, and dealer liquidity streams:
+##### Graph-Based Multi-Venue Dispatch
+Slices parent orders across fragmented lit exchanges, dark pools, and dealer liquidity streams:
 
 $$
 \min_{\{q_i\}} \sum_{i=1}^M \left[ q_i P_i + c_i^{\text{fee}}(q_i) + \text{Slippage}_i(q_i, \Delta \tau_i) \right] \quad \text{s.t.} \quad \sum_{i=1}^M q_i = Q_{\text{target}}
 $$
 
-  accounting for venue taker fees, maker rebate tiers, queue length at each tick, and packet travel latency $\Delta \tau_i$.
+accounting for venue taker fees, maker rebate tiers, queue length at each tick, and packet travel latency $\Delta \tau_i$.
 
 ---
 
@@ -715,7 +727,7 @@ $$
 Q_{\text{ahead}}(t) = Q_{\text{ahead}}(0) - \text{Executions}(t) - \alpha_{\text{cancel}} \cdot \text{Cancellations}(t)
 $$
 
-  where $\alpha_{\text{cancel}} \in [0, 1]$ models the empirical ratio of cancellations occurring ahead of our resting order versus behind it.
+where $\alpha_{\text{cancel}} \in [0, 1]$ models the empirical ratio of cancellations occurring ahead of our resting order versus behind it.
 
 #### C. Ring Buffers & Lock-Free Multi-Producer Single-Consumer (MPSC) Queues
 * **The Disruptor Pattern:** Standard OS mutex locks induce context switches that cost several microseconds. HFT pipelines deploy lock-free circular ring buffers with cache-padded atomic sequence counters using acquire-release memory barriers, passing tick packets from network cards directly to pricing engines in nanoseconds.
