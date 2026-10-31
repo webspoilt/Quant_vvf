@@ -1,0 +1,46 @@
+# ==============================================================================
+# Quant_vvf - Production & Research Dependency Manifest
+# Falsification-first Volatility Risk Premium & HFT Execution Engine (Deribit BTC)
+#
+# Install all dependencies:
+#   pip install -r requirements.txt
+#
+# Install in editable development mode:
+#   pip install -e .
+# ==============================================================================
+
+# --- Core Quantitative, Numerical & Statistical Computing ---
+numpy>=2.0.0
+scipy>=1.14.0
+pandas>=2.2.0
+statsmodels>=0.14.0
+pyarrow>=14.0.0
+
+# --- Configuration & Network Ingestion ---
+pyyaml>=6.0.2
+requests>=2.32.3  # Patched for CVE-2024-35195
+
+# --- Execution Engine & Microsecond Actor ---
+nautilus-trader>=1.190.0
+
+# --- Institutional Options Pricing & Analytical Benchmarks ---
+QuantLib>=1.35
+
+# --- Research, Analytics & Notebook Pipeline ---
+nbformat>=5.9.0
+matplotlib>=3.8.0
+seaborn>=0.13.0
+
+# --- Testing, Falsification & Verification Suite ---
+pytest>=7.4.0
+pytest-cov>=4.1.0
+pytest-asyncio>=0.23.0
+hypothesis>=6.100.0
+
+# --- Static Type Analysis & Linting ---
+mypy>=1.8.0
+types-PyYAML>=6.0.12.20240917
+types-requests>=2.32.0.20241016
+
+# --- Build System & Security Baseline ---
+setuptools>=70.0.0  # Patched for CVE-2024-6345

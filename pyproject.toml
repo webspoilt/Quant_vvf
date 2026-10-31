@@ -19,7 +19,19 @@ dependencies = [
 
 [project.optional-dependencies]
 prod = ["nautilus-trader>=1.190"]
-dev = ["pytest>=7.4", "mypy>=1.8", "QuantLib>=1.35"]
+dev = [
+    "pytest>=7.4",
+    "pytest-cov>=4.1",
+    "pytest-asyncio>=0.23",
+    "hypothesis>=6.100",
+    "mypy>=1.8",
+    "QuantLib>=1.35",
+    "nbformat>=5.9",
+    "matplotlib>=3.8",
+    "seaborn>=0.13",
+    "types-PyYAML>=6.0.12",
+    "types-requests>=2.32.0",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -909,9 +909,11 @@ cd Quant_vvf
 python -m venv .venv
 source .venv/bin/activate  # On Windows: .venv\Scripts\Activate.ps1
 
-# Install core dependencies with development and benchmark tools
-pip install -e .
-pip install ".[dev,prod]"
+# Install all required dependencies
+pip install -r requirements.txt
+
+# Or install in editable mode with development & production extras
+pip install -e ".[dev,prod]"
 ```
 
 ### Running the Test Suite
