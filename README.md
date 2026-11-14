@@ -1,4 +1,6 @@
-# Quant_vvf
+<div align="center">
+
+![Quant_vvf Animated Hero Banner](docs/assets/hero_banner.svg)
 
 [![Python Version](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/)
 [![C++ Standard](https://img.shields.io/badge/c%2B%2B-20-blue.svg)](https://en.cppreference.com/w/cpp/20)
@@ -10,11 +12,15 @@
 [![Paper Registry](https://img.shields.io/badge/research-21%20papers%20verified-purple.svg)](docs/research/PAPER_REGISTRY.md)
 [![Status](https://img.shields.io/badge/status-Research%20Grade%20Verified-success.svg)](docs/research/MASTER_RESEARCH_ARCHITECTURE.md)
 
-A systematic, modular research and execution platform engineered for trading the **Volatility Risk Premium (VRP)** on Deribit BTC options and inverse perpetual futures.
+<p align="center">
+  <b>A systematic institutional research, deep learning, and ultra-low latency execution platform for the Volatility Risk Premium (VRP) on Deribit BTC options and inverse perpetual futures.</b>
+</p>
 
-`Quant_vvf` is a **falsification-first scientific test harness** designed to evaluate, test, and execute under the formal empirical hypothesis:
+</div>
 
-> **Pre-Registered Hypothesis:** *Systematically harvesting the Deribit BTC Volatility Risk Premium via delta-hedged short option structures yields statistically significant positive risk-adjusted returns net of crypto venue friction (taker fees, slippage, and crossing spreads) if and only if the portfolio is conditioned on deterministic, non-parametric tail triggers and independent fail-closed risk gatekeeping.*
+---
+
+> **Pre-Registered Empirical Hypothesis:** *Systematically harvesting the Deribit BTC Volatility Risk Premium via delta-hedged short option structures yields statistically significant positive risk-adjusted returns net of crypto venue friction (taker fees, slippage, and crossing spreads) if and only if the portfolio is conditioned on deterministic, non-parametric tail triggers and independent fail-closed risk gatekeeping.*
 
 Every module within this engine is constructed around strict kill gates. Complexity is never added to rescue a failed statistical premise: if a mathematical hypothesis or risk parameter fails out-of-sample testing, execution halts immediately.
 
@@ -70,9 +76,22 @@ flowchart TD
     end
 ```
 
+### Visual Microstructure & Latency Pipeline
+<div align="center">
+
+![End-to-End Latency Benchmark](docs/assets/latency_pipeline_chart.svg)
+
+</div>
+
 ---
 
 ## 3. Mathematical Foundation and Core Algorithms
+
+<div align="center">
+
+![Calibrated Volatility Surface](docs/assets/volatility_surface_chart.svg)
+
+</div>
 
 ### A. Inverse Coin-Margined Numeraire Payoffs and Convexity Drift
 
