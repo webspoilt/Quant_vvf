@@ -1,14 +1,56 @@
+# Python
 __pycache__/
 *.py[cod]
+*$py.class
+*.so
+.Python
 .mypy_cache/
 .pytest_cache/
+.benchmarks/
 .ipynb_checkpoints/
-data/raw/*.csv.gz
-data/processed/*.parquet
-data/processed/*.meta.json
 *.egg-info/
 dist/
 build/
+develop-eggs/
+eggs/
+parts/
+var/
+sdist/
+installed.cfg
+*.egg
+
+# C++ binaries, objects, libraries, and WAL journals
+*.exe
+*.o
+*.obj
+*.a
+*.lib
+*.dll
+*.dylib
+*.so
+*.wal
+*.journal
+hft/tests/*.exe
+
+# Rust build target & artifacts
+rust_hft/target/
+**/target/
+Cargo.lock.orig
+
+# Frontend node_modules & build
+frontend/node_modules/
+node_modules/
+frontend/dist/
+frontend/build/
+.npm
+.yarn
+
+# Data files (raw/processed market data)
+data/raw/*.csv.gz
+data/raw/*.csv
+data/processed/*.parquet
+data/processed/*.meta.json
+*.parquet
 
 # Environment & Secrets (V-09): never commit credentials or key material
 .env
@@ -26,6 +68,7 @@ credentials.json
 venv/
 .venv/
 env/
+ENV/
 
 # Coverage & Testing
 .coverage
@@ -36,6 +79,7 @@ htmlcov/
 # Logs & Runtime
 *.log
 logs/
+*.pid
 
 # IDE & OS & Agent Local State
 .vscode/
@@ -43,3 +87,5 @@ logs/
 .DS_Store
 Thumbs.db
 .antigravity/
+*.swp
+*.swo

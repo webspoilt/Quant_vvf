@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quant_vvf — Institutional Quantitative Trading & HFT Terminal</title>
+    <style>
+        :root {
+            --bg-primary: #0a0d14;
+            --bg-secondary: #121824;
+            --bg-tertiary: #1b2438;
+            --border-color: #24304c;
+            --text-primary: #e6edf3;
+            --text-secondary: #8b9bb4;
+            --accent-blue: #3b82f6;
+            --accent-green: #10b981;
+            --accent-red: #ef4444;
+            --accent-yellow: #f59e0b;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
+        body { background-color: var(--bg-primary); color: var(--text-primary); display: flex; height: 100vh; overflow: hidden; }
+        
+        /* Sidebar */
+        .sidebar { width: 240px; background-color: var(--bg-secondary); border-right: 1px solid var(--border-color); display: flex; flex-direction: column; }
+        .sidebar-header { padding: 20px; font-weight: 700; font-size: 1.1rem; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; gap: 8px; }
+        .sidebar-nav { flex: 1; padding: 12px; display: flex; flex-direction: column; gap: 4px; }
+        .nav-item { padding: 10px 14px; border-radius: 6px; cursor: pointer; color: var(--text-secondary); font-size: 0.9rem; display: flex; align-items: center; gap: 10px; transition: all 0.15s; }
+        .nav-item:hover, .nav-item.active { background-color: var(--bg-tertiary); color: var(--text-primary); }
+        .system-badge { padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; text-align: center; }
+        .badge-sim { background-color: #1e3a8a; color: #93c5fd; }
+        .badge-hft { background-color: #064e3b; color: #6ee7b7; }
+
+        /* Main Workspace */
+        .main-content { flex: 1; display: flex; flex-direction: column; overflow-y: auto; }
+        .top-bar { height: 56px; border-bottom: 1px solid var(--border-color); background-color: var(--bg-secondary); display: flex; align-items: center; justify-content: space-between; padding: 0 24px; }
+        .market-ticker { display: flex; gap: 24px; font-size: 0.88rem; }
+        .ticker-item { display: flex; gap: 8px; }
+        .val-up { color: var(--accent-green); }
+        .val-down { color: var(--accent-red); }
+
+        .dashboard-grid { padding: 24px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
+        .card { background-color: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 8px; padding: 18px; }
+        .card-header { font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .card-value { font-size: 1.6rem; font-weight: 700; margin-bottom: 4px; }
+        .card-subtext { font-size: 0.8rem; color: var(--text-secondary); }
+
+        .wide-card { grid-column: span 2; }
+        .full-card { grid-column: span 4; }
+
+        /* Table styles */
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.85rem; }
+        th { text-align: left; padding: 10px; border-bottom: 1px solid var(--border-color); color: var(--text-secondary); font-weight: 600; }
+        td { padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+
+        /* Status Pills */
+        .pill { padding: 2px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; }
+        .pill-green { background: rgba(16, 185, 129, 0.2); color: var(--accent-green); }
+        .pill-blue { background: rgba(59, 130, 246, 0.2); color: var(--accent-blue); }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <span>⚡ QUANT_VVF</span>
+            <span class="system-badge badge-hft">C++20/Rust</span>
+        </div>
+        <div class="sidebar-nav">
+            <div class="nav-item active">📊 Dashboard</div>
+            <div class="nav-item">📈 Market Overview</div>
+            <div class="nav-item">🎯 Options Analytics</div>
+            <div class="nav-item">🧪 Strategy Laboratory</div>
+            <div class="nav-item">⚖️ Portfolio & Risk</div>
+            <div class="nav-item">🤖 JARVIS AI Copilot</div>
+            <div class="nav-item">⚡ HFT Execution Monitor</div>
+            <div class="nav-item">📓 Trade Journal</div>
+        </div>
+        <div style="padding: 16px; border-top: 1px solid var(--border-color); font-size: 0.75rem; color: var(--text-secondary);">
+            <div>Environment: <b>Paper / Sim</b></div>
+            <div>Risk Gate: <span class="pill pill-green">ACTIVE</span></div>
+            <div>Exchange: <b>Deribit Starbase SBE</b></div>
+        </div>
+    </div>
+
+    <div class="main-content">
+        <div class="top-bar">
+            <div class="market-ticker">
+                <div class="ticker-item"><span>BTC-PERPETUAL:</span> <b class="val-up">$65,420.50 (+2.14%)</b></div>
+                <div class="ticker-item"><span>BTC-28MAR25-65000-C:</span> <b>$4,210.00 (IV: 58.2%)</b></div>
+                <div class="ticker-item"><span>VRP (IV - RV):</span> <b class="val-up">+8.4%</b></div>
+                <div class="ticker-item"><span>Regime:</span> <span class="pill pill-blue">Calm Volatility</span></div>
+            </div>
+            <div>
+                <span class="system-badge badge-sim">PAPER TRADING ONLY</span>
+            </div>
+        </div>
+
+        <div class="dashboard-grid">
+            <div class="card">
+                <div class="card-header">Portfolio Equity</div>
+                <div class="card-value">$104,820.00</div>
+                <div class="card-subtext val-up">+$4,820.00 (+4.82% Total Return)</div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">Gross Risk Exposure</div>
+                <div class="card-value">2.40 BTC</div>
+                <div class="card-subtext">Limit: 50.00 BTC (4.8% Cap Utilized)</div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">Net Directional Delta</div>
+                <div class="card-value">+0.04 BTC</div>
+                <div class="card-subtext val-up">Delta Neutral (Band ±0.15 BTC)</div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">Sharpe / Calmar Ratio</div>
+                <div class="card-value">2.45 / 3.12</div>
+                <div class="card-subtext">Max Drawdown: 2.85%</div>
+            </div>
+
+            <!-- Middle Row: Strategy & VRP Analytics -->
+            <div class="card wide-card">
+                <div class="card-header">Active Volatility & Greek Rebalancing Strategies</div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Strategy ID</th>
+                            <th>Instrument</th>
+                            <th>Target Clip</th>
+                            <th>Status</th>
+                            <th>Realized PnL</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><b>VRP-REBAL-01</b></td>
+                            <td>BTC Options / Perp Hedge</td>
+                            <td>1.0 BTC</td>
+                            <td><span class="pill pill-green">ACTIVE</span></td>
+                            <td class="val-up">+$3,410.00</td>
+                        </tr>
+                        <tr>
+                            <td><b>STAT-ARB-02</b></td>
+                            <td>BTC / ETH Spread</td>
+                            <td>0.5 BTC</td>
+                            <td><span class="pill pill-green">ACTIVE</span></td>
+                            <td class="val-up">+$1,410.00</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="card wide-card">
+                <div class="card-header">Low-Latency Execution Engine (C++20 & Rust Starbase)</div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Component</th>
+                            <th>Metric / State</th>
+                            <th>Latency / Detail</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>SBE Wire Decoder</td>
+                            <td>Zero-Copy Slicing</td>
+                            <td>&lt; 50 ns (Core Pinned)</td>
+                            <td><span class="pill pill-green">VERIFIED</span></td>
+                        </tr>
+                        <tr>
+                            <td>Pre-Trade Risk Gate</td>
+                            <td>Open-Addressing Ledger</td>
+                            <td>&lt; 15 ns inline check</td>
+                            <td><span class="pill pill-green">FAIL-CLOSED</span></td>
+                        </tr>
+                        <tr>
+                            <td>Exec Dedup Engine</td>
+                            <td>Tombstone Hash Table</td>
+                            <td>2048 slot FIFO probe</td>
+                            <td><span class="pill pill-green">BOUNDED</span></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Bottom Row: Recent Auditable Trade Journal -->
+            <div class="card full-card">
+                <div class="card-header">Recent Auditable Fills & Reconciliations</div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Trade ID</th>
+                            <th>Strategy</th>
+                            <th>Side</th>
+                            <th>Quantity</th>
+                            <th>Fill Price</th>
+                            <th>Slippage</th>
+                            <th>Fee</th>
+                            <th>Risk Decision</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>TRD-20261114-001</td>
+                            <td>VRP-REBAL-01</td>
+                            <td><b class="val-down">SELL</b></td>
+                            <td>0.20 BTC</td>
+                            <td>$65,000.00</td>
+                            <td>0.5 bps</td>
+                            <td>$6.50</td>
+                            <td><span class="pill pill-green">APPROVED</span></td>
+                        </tr>
+                        <tr>
+                            <td>TRD-20261114-002</td>
+                            <td>STAT-ARB-02</td>
+                            <td><b class="val-up">BUY</b></td>
+                            <td>0.10 BTC</td>
+                            <td>$64,980.00</td>
+                            <td>1.0 bps</td>
+                            <td>$3.25</td>
+                            <td><span class="pill pill-green">APPROVED</span></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

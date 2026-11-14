@@ -1,9 +1,12 @@
 # Quant_vvf
 
 [![Python Version](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/)
+[![C++ Standard](https://img.shields.io/badge/c%2B%2B-20-blue.svg)](https://en.cppreference.com/w/cpp/20)
+[![Rust Edition](https://img.shields.io/badge/rust-2024%20edition-orange.svg)](https://www.rust-lang.org/)
 [![Type Checking](https://img.shields.io/badge/typing-mypy%20strict-green.svg)](https://mypy-lang.org/)
-[![Test Suite](https://img.shields.io/badge/tests-124%20passed-brightgreen.svg)](https://docs.pytest.org/)
-[![Validation](https://img.shields.io/badge/math%20oracle-QuantLib-orange.svg)](https://www.quantlib.org/)
+[![Test Suite](https://img.shields.io/badge/tests-182%20passed-brightgreen.svg)](docs/FINAL_VERIFICATION_REPORT.md)
+[![Math Oracle](https://img.shields.io/badge/math%20oracle-QuantLib-orange.svg)](https://www.quantlib.org/)
+[![Status](https://img.shields.io/badge/status-Engineering%20Verified-success.svg)](docs/audit/FINAL_INDEPENDENT_AUDIT.md)
 
 A systematic, modular research and execution platform engineered for trading the **Volatility Risk Premium (VRP)** on Deribit BTC options and inverse perpetual futures.
 
@@ -917,28 +920,29 @@ pip install -e ".[dev,prod]"
 ```
 
 ### Running the Test Suite
-The repository includes a comprehensive, phased test harness:
+The repository includes a comprehensive, multi-language verified test harness (182 total passing tests):
 
 ```bash
-# 1. Run all unit tests, bias checks, and QuantLib benchmarks (fast, offline)
-pytest -v tests/unit tests/bias_checks
-
-# 2. Run Phase 0 numeraire ledger reconciliation
-pytest -v -s -m "not realdata" tests/regression/test_phase0_numeraire.py
-
-# 3. Run Phase 1 SVI calibration and VRP regression kill gate
-pytest -v -s tests/regression/test_phase1_vrp_regression.py
-
-# 4. Run Phase 2 Volatility Forecasting competition
-pytest -v -s tests/regression/test_phase2_benchmark.py
-
-# 5. Run Phase 3 Tail Timing and Crash Replay
-pytest -v -s tests/regression/test_phase3_tail_timing.py
-
-# 6. Execute full suite across all phases
+# 1. Run Python test suite (147 tests: unit, bias checks, regression, and benchmarks)
 pytest -v
 
-# 7. Run static type checking (strict mode)
+# 2. Run Rust SBE feed-handler tests and clippy linter (14 tests)
+cd rust_hft
+cargo test --all-targets --all-features
+cargo clippy --all-targets --all-features -- -D warnings
+cd ..
+
+# 3. Compile and execute C++20 Seventh Remediation & WAL Recovery test suite (10 tests)
+cd hft/tests
+clang++ -std=c++20 -O2 -I../include test_seventh_remediation.cpp -o test_seventh.exe
+./test_seventh.exe
+
+# 4. Compile and execute C++20 Fifth Remediation & Ledger Invariants suite (11 tests)
+clang++ -std=c++20 -O2 -I../include test_fifth_remediation.cpp -o test_fifth.exe
+./test_fifth.exe
+cd ../..
+
+# 5. Run static type checking (strict mode)
 mypy libs/core libs/data strategies risk execution monitoring simulation
 ```
 

@@ -1,0 +1,21 @@
+[package]
+name = "hft-gateway"
+version = "0.1.0"
+edition = "2024"
+authors = ["Quant Engineering Team"]
+description = "Ultra-low-latency HFT ingestion and order gateway skeleton"
+
+[dependencies]
+# Thread pinning to dedicated CPU cores
+core_affinity = "0.8"
+
+# Zero-copy binary decoding and struct memory mapping
+zerocopy = { version = "0.8", features = ["derive"] }
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+overflow-checks = false
+debug = false
