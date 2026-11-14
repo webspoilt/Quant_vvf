@@ -1,0 +1,78 @@
+name: Multi-Language Continuous Integration
+
+on:
+  push:
+    branches: [ main, feature/** ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  python-tests:
+    name: Python Quantitative & Research Suite (181 Tests)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install -r requirements.txt
+          pip install arch
+
+      - name: Run Pytest Test Suite
+        run: |
+          pytest -v
+
+  cpp-tests:
+    name: C++20 HFT Engine & Ledger Suites (21 Tests)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Clang & Build Tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang
+
+      - name: Compile & Run Seventh Remediation Suite (10 Tests)
+        run: |
+          cd hft/tests
+          clang++ -std=c++20 -O2 -I../include test_seventh_remediation.cpp -o test_seventh
+          ./test_seventh
+
+      - name: Compile & Run Fifth Remediation Suite (11 Tests)
+        run: |
+          cd hft/tests
+          clang++ -std=c++20 -O2 -I../include test_fifth_remediation.cpp -o test_fifth
+          ./test_fifth
+
+      - name: Compile & Run Hardware Latency Benchmark Harness
+        run: |
+          cd hft/benchmarks
+          clang++ -std=c++20 -O3 -DNDEBUG -I../include bench_engine_latency.cpp -o bench_engine
+          ./bench_engine
+
+  rust-tests:
+    name: Rust 2024 SBE Feed Handler & Gateway (14 Tests)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust Toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Run Cargo Check & Tests
+        run: |
+          cd rust_hft
+          cargo fmt --check
+          cargo clippy --all-targets --all-features -- -D warnings
+          cargo test --all-targets --all-features

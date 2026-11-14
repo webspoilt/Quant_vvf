@@ -9,7 +9,8 @@
 [![Type Checking](https://img.shields.io/badge/typing-mypy%20strict-green.svg)](https://mypy-lang.org/)
 [![Test Suite](https://img.shields.io/badge/tests-216%20passed-brightgreen.svg)](docs/research/MASTER_RESEARCH_ARCHITECTURE.md)
 [![Math Oracle](https://img.shields.io/badge/math%20oracle-QuantLib-orange.svg)](https://www.quantlib.org/)
-[![Paper Registry](https://img.shields.io/badge/research-21%20papers%20verified-purple.svg)](docs/research/PAPER_REGISTRY.md)
+[![Paper Registry](https://img.shields.io/badge/research-23%20papers%20classified-purple.svg)](docs/research/PAPER_REGISTRY_AUDIT.md)
+[![CI Workflow](https://github.com/webspoilt/Quant_vvf/actions/workflows/ci.yml/badge.svg)](https://github.com/webspoilt/Quant_vvf/actions/workflows/ci.yml)
 [![Status](https://img.shields.io/badge/status-Research%20Grade%20Verified-success.svg)](docs/research/MASTER_RESEARCH_ARCHITECTURE.md)
 
 <p align="center">
@@ -33,8 +34,8 @@ Every module within this engine is constructed around strict kill gates. Complex
 3. **Instruments over Weights:** The strategy layer does not emit continuous portfolio weights ($w^T \mu$). It emits **Target Greek Profiles** ($\Delta, \Gamma, \mathcal{V}, \Theta$, margin utilization); the discrete solver resolves integer strikes and expiries subject to mixed-integer linear and non-linear margin constraints.
 4. **No Uncalibrated Data:** Raw exchange mark IVs are never consumed directly. A Gatheral Quasi-Explicit Surface (SVI) is calibrated per expiry slice, enforcing Durrleman butterfly non-arbitrage ($g(k) \ge 0$) and calendar monotonicity ($w(k, \tau_1) \le w(k, \tau_2)$).
 5. **Independent Fail-Closed Risk Authority:** The execution layer has zero direct order-routing authority. Pure, deterministic risk gatekeepers maintain unilateral veto power. If an internal evaluation raises an exception or breaches boundaries, the state fails closed (`REJECT` / `HALT_AND_VETO`).
-6. **Immediate Venue-Native Cloud Brackets:** Upon fill confirmation, the execution engine synchronously places exchange-native conditional stops (Deribit mark-price triggers), ensuring venue-side liquidation defense even during total client network disconnection.
-7. **Explicit Rejection of Qualitative LLM Multi-Agent Debates:** Volatility harvesting requires sub-millisecond local variance stops and closed-form non-linear continuous geometry. Qualitative LLM debates introduce non-deterministic execution latency (seconds vs. microseconds) and hallucinated entry rules that invalidate statistical pre-registration.
+6. **Venue-Native Protective Conditional Orders:** Upon fill confirmation, the execution engine places exchange-native conditional stops (Deribit mark-price triggers), seeking venue-side liquidation defense subject to exchange order book liquidity and counterparty matching availability.
+7. **Explicit Sandboxing of AI Multi-Agent Systems:** Volatility harvesting requires deterministic, sub-microsecond local variance stops and closed-form non-linear continuous geometry. The JARVIS multi-agent copilot operates strictly in a sandboxed research and advisory capacity with zero direct execution authority.
 
 ---
 

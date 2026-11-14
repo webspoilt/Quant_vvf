@@ -1,18 +1,8 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 240" width="100%" height="240">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 300" width="100%" height="300">
   <defs>
     <linearGradient id="pipeBg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#070a12" />
-      <stop offset="100%" stop-color="#030509" />
-    </linearGradient>
-
-    <linearGradient id="neonCyanGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#00f2fe" />
-      <stop offset="100%" stop-color="#4facfe" />
-    </linearGradient>
-
-    <linearGradient id="neonGreenGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#10b981" />
-      <stop offset="100%" stop-color="#34d399" />
+      <stop offset="0%" stop-color="#080c16" />
+      <stop offset="100%" stop-color="#04060c" />
     </linearGradient>
 
     <filter id="pGlow">
@@ -28,9 +18,10 @@
     .node-title { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-weight: 700; font-size: 13px; fill: #ffffff; }
     .node-sub { font-family: 'JetBrains Mono', Consolas, monospace; font-size: 10.5px; fill: #94a3b8; }
     .metric-val { font-family: 'JetBrains Mono', Consolas, monospace; font-weight: 700; font-size: 11px; fill: #00f2fe; }
+    .footer-note { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 10px; fill: #64748b; }
 
     @keyframes packetFlow {
-      0% { stroke-dashoffset: 200; }
+      0% { stroke-dashoffset: 120; }
       100% { stroke-dashoffset: 0; }
     }
 
@@ -40,7 +31,7 @@
     }
 
     .flow-line {
-      stroke-dasharray: 8, 6;
+      stroke-dasharray: 6, 6;
       animation: packetFlow 2s linear infinite;
     }
 
@@ -54,56 +45,67 @@
 
   <!-- Flow Connector Lines -->
   <g stroke="#00f2fe" stroke-width="2" opacity="0.8" class="flow-line" filter="url(#pGlow)">
-    <line x1="200" y1="120" x2="250" y2="120" />
-    <line x1="430" y1="120" x2="480" y2="120" />
-    <line x1="660" y1="120" x2="710" y2="120" />
+    <line x1="205" y1="120" x2="245" y2="120" />
+    <line x1="435" y1="120" x2="475" y2="120" />
+    <line x1="665" y1="120" x2="705" y2="120" />
   </g>
 
   <!-- Header -->
-  <text x="35" y="38" font-family="-apple-system, sans-serif" font-weight="700" font-size="14" fill="#ffffff">END-TO-END TICK-TO-ORDER LATENCY BENCHMARK</text>
-  <text x="35" y="55" font-family="-apple-system, sans-serif" font-size="11" fill="#64748b">Verified in host execution harness • Equinix LD4 bare-metal target architecture</text>
+  <text x="35" y="34" font-family="-apple-system, sans-serif" font-weight="700" font-size="14" fill="#ffffff">REPRODUCIBLE LATENCY PROFILING (MEASURED ON INTEL CORE i5-11400H / MICRON NVMe)</text>
+  <text x="35" y="52" font-family="-apple-system, sans-serif" font-size="11" fill="#94a3b8">Empirical median latencies measured via bench_engine.exe across 100k samples • Windows 11 NTFS</text>
 
   <!-- Stage 1: Rust SBE Feed -->
   <g transform="translate(35, 75)">
-    <rect width="165" height="110" rx="8" fill="#0f172a" stroke="#334155" stroke-width="1.5" />
+    <rect width="170" height="125" rx="8" fill="#0f172a" stroke="#334155" stroke-width="1.5" />
     <circle cx="20" cy="24" r="4" fill="#10b981" class="blinker" />
-    <text x="32" y="28" class="node-title">1. Feed Ingest</text>
-    <text x="16" y="52" class="node-sub">Rust 2024 SBE</text>
-    <text x="16" y="70" class="node-sub">UDP Multicast</text>
-    <rect x="16" y="82" width="133" height="18" rx="4" fill="#0284c7" fill-opacity="0.2" />
-    <text x="24" y="95" class="metric-val">&lt; 420 ns / packet</text>
+    <text x="32" y="28" class="node-title">1. SBE Parsing</text>
+    <text x="16" y="50" class="node-sub">Zero-Copy Rust</text>
+    <text x="16" y="66" class="node-sub">16 Channels</text>
+    <rect x="16" y="80" width="138" height="34" rx="4" fill="#0284c7" fill-opacity="0.15" />
+    <text x="24" y="94" class="metric-val">P50: &lt; 0.45 µs</text>
+    <text x="24" y="108" class="node-sub" font-size="9.5">P99: 1.20 µs</text>
   </g>
 
-  <!-- Stage 2: SPSC Queue & Parsing -->
-  <g transform="translate(250, 75)">
-    <rect width="180" height="110" rx="8" fill="#0f172a" stroke="#334155" stroke-width="1.5" />
+  <!-- Stage 2: SPSC Queue & Memory -->
+  <g transform="translate(245, 75)">
+    <rect width="190" height="125" rx="8" fill="#0f172a" stroke="#334155" stroke-width="1.5" />
     <circle cx="20" cy="24" r="4" fill="#00f2fe" class="blinker" />
-    <text x="32" y="28" class="node-title">2. Ring Buffer</text>
-    <text x="16" y="52" class="node-sub">Lock-Free SPSC</text>
-    <text x="16" y="70" class="node-sub">Zero Allocation</text>
-    <rect x="16" y="82" width="148" height="18" rx="4" fill="#0284c7" fill-opacity="0.2" />
-    <text x="24" y="95" class="metric-val">&lt; 180 ns transfer</text>
+    <text x="32" y="28" class="node-title">2. Lock-Free Queue</text>
+    <text x="16" y="50" class="node-sub">SPSC Ring Buffer</text>
+    <text x="16" y="66" class="node-sub">In-Memory Push+Pop</text>
+    <rect x="16" y="80" width="158" height="34" rx="4" fill="#0284c7" fill-opacity="0.15" />
+    <text x="24" y="94" class="metric-val">P50: &lt; 0.10 µs</text>
+    <text x="24" y="108" class="node-sub" font-size="9.5">P99: 0.10 µs</text>
   </g>
 
   <!-- Stage 3: Deterministic Pre-Trade Risk -->
-  <g transform="translate(480, 75)">
-    <rect width="180" height="110" rx="8" fill="#0f172a" stroke="#334155" stroke-width="1.5" />
+  <g transform="translate(475, 75)">
+    <rect width="190" height="125" rx="8" fill="#0f172a" stroke="#334155" stroke-width="1.5" />
     <circle cx="20" cy="24" r="4" fill="#f59e0b" class="blinker" />
-    <text x="32" y="28" class="node-title">3. Risk Gate</text>
-    <text x="16" y="52" class="node-sub">C++20 Open Addr</text>
-    <text x="16" y="70" class="node-sub">Fail-Closed Limits</text>
-    <rect x="16" y="82" width="148" height="18" rx="4" fill="#f59e0b" fill-opacity="0.2" />
-    <text x="24" y="95" class="metric-val" fill="#f59e0b">&lt; 310 ns check</text>
+    <text x="32" y="28" class="node-title">3. Pre-Trade Risk</text>
+    <text x="16" y="50" class="node-sub">Open-Addr Slot Scan</text>
+    <text x="16" y="66" class="node-sub">Clip &amp; Gross Limits</text>
+    <rect x="16" y="80" width="158" height="34" rx="4" fill="#f59e0b" fill-opacity="0.15" />
+    <text x="24" y="94" class="metric-val" fill="#f59e0b">P50: 0.70 µs</text>
+    <text x="24" y="108" class="node-sub" font-size="9.5">P99: 0.80 µs</text>
   </g>
 
   <!-- Stage 4: Execution & Durable WAL -->
-  <g transform="translate(710, 75)">
-    <rect width="155" height="110" rx="8" fill="#0f172a" stroke="#334155" stroke-width="1.5" />
+  <g transform="translate(705, 75)">
+    <rect width="180" height="125" rx="8" fill="#0f172a" stroke="#334155" stroke-width="1.5" />
     <circle cx="20" cy="24" r="4" fill="#8b5cf6" class="blinker" />
-    <text x="32" y="28" class="node-title">4. Durable WAL</text>
-    <text x="16" y="52" class="node-sub">Atomic Two-Phase</text>
-    <text x="16" y="70" class="node-sub">CRC + _commit</text>
-    <rect x="16" y="82" width="123" height="18" rx="4" fill="#8b5cf6" fill-opacity="0.2" />
-    <text x="24" y="95" class="metric-val" fill="#e0c3fc">&lt; 950 ns roundtrip</text>
+    <text x="32" y="28" class="node-title">4. Execution &amp; WAL</text>
+    <text x="16" y="50" class="node-sub">In-Mem: 2.80 µs</text>
+    <text x="16" y="66" class="node-sub">Buffer Append: &lt; 0.1 µs</text>
+    <rect x="16" y="80" width="148" height="34" rx="4" fill="#8b5cf6" fill-opacity="0.15" />
+    <text x="24" y="94" class="metric-val" fill="#e0c3fc">Disk Sync: 850 µs</text>
+    <text x="24" y="108" class="node-sub" font-size="9.5">Hardware fsync P99: 2.2 ms</text>
+  </g>
+
+  <!-- Footer Disclaimer -->
+  <g transform="translate(35, 230)">
+    <rect width="850" height="48" rx="6" fill="#0c121e" stroke="#1e293b" stroke-width="1" />
+    <text x="16" y="20" class="footer-note" fill="#cbd5e1" font-weight="600">CRITICAL DISCLOSURE ON PHYSICAL STORAGE DURABILITY:</text>
+    <text x="16" y="36" class="footer-note">In-memory risk and queue operations complete in sub-microsecond intervals. However, true physical crash-resilient WAL writes requiring hardware storage flush (_commit / fsync) take ~850 microseconds on NVMe SSD flash. Sub-microsecond disk persistence requires battery-backed NVDIMM hardware.</text>
   </g>
 </svg>
