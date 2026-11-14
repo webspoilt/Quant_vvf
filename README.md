@@ -1,20 +1,20 @@
 <div align="center">
 
-![Quant_vvf Animated Hero Banner](docs/assets/hero_banner.svg)
+![Quant_vvf Multi-Market Architecture](docs/assets/hero_multimarket_banner.svg)
 
 [![Python Version](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/)
 [![C++ Standard](https://img.shields.io/badge/c%2B%2B-20-blue.svg)](https://en.cppreference.com/w/cpp/20)
 [![Rust Edition](https://img.shields.io/badge/rust-2024%20edition-orange.svg)](https://www.rust-lang.org/)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.15%2B-EE4C2C.svg)](https://pytorch.org/)
 [![Type Checking](https://img.shields.io/badge/typing-mypy%20strict-green.svg)](https://mypy-lang.org/)
-[![Test Suite](https://img.shields.io/badge/tests-216%20passed-brightgreen.svg)](docs/research/MASTER_RESEARCH_ARCHITECTURE.md)
-[![Math Oracle](https://img.shields.io/badge/math%20oracle-QuantLib-orange.svg)](https://www.quantlib.org/)
-[![Paper Registry](https://img.shields.io/badge/research-23%20papers%20classified-purple.svg)](docs/research/PAPER_REGISTRY_AUDIT.md)
+[![Test Suite](https://img.shields.io/badge/tests-231%20passed-brightgreen.svg)](docs/ADVANCED_RESEARCH_ACCEPTANCE_MATRIX.md)
+[![Math Oracle](https://img.shields.io/badge/math%20oracle-QuantLib%20%7C%20SciPy-orange.svg)](https://www.quantlib.org/)
+[![Multi-Market](https://img.shields.io/badge/markets-Deribit%20%7C%20NSE%20%7C%20BSE%20%7C%20GIFT%20City-blueviolet.svg)](docs/ADVANCED_MULTI_MARKET_ARCHITECTURE.md)
 [![CI Workflow](https://github.com/webspoilt/Quant_vvf/actions/workflows/ci.yml/badge.svg)](https://github.com/webspoilt/Quant_vvf/actions/workflows/ci.yml)
-[![Status](https://img.shields.io/badge/status-Research%20Grade%20Verified-success.svg)](docs/research/MASTER_RESEARCH_ARCHITECTURE.md)
+[![Status](https://img.shields.io/badge/status-Research%20Grade%20Verified-success.svg)](docs/ADVANCED_RESEARCH_ACCEPTANCE_MATRIX.md)
 
 <p align="center">
-  <b>A systematic institutional research, deep learning, and ultra-low latency execution platform for the Volatility Risk Premium (VRP) on Deribit BTC options and inverse perpetual futures.</b>
+  <b>An institutional-grade, multi-market quantitative finance research, stochastic calculus, mathematical physics, and low-latency execution platform spanning Deribit BTC options/perpetuals, NSE & BSE Indian derivatives, and GIFT City (NSE IX).</b>
 </p>
 
 </div>
