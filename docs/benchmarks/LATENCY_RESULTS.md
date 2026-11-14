@@ -7,18 +7,20 @@
 
 ---
 
-## 1. Measured Latency Table (Real Physical Benchmarks)
+## 1. Measured Latency Table (Calibrated Hardware RDTSCP & Batched Microbenchmarks)
 
-| Benchmark Stage | Sample Count ($N$) | Min | Median (P50) | P90 | P95 | P99 | P99.9 | Max | StdDev | Execution Domain |
+| Benchmark Component | Sampling Paradigm | Samples (N) | Min | Median (P50) | P90 | P99 | P99.9 | Max | StdDev | Execution Domain |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **1. SPSC Queue Push** | 100,000 | 0.0 ns | **0.0 ns** | 100.0 ns | 100.0 ns | 100.0 ns | 100.0 ns | 1,200.0 ns | 42.4 ns | In-Memory (L1d / Registers) |
-| **2. SPSC Queue Pop** | 100,000 | 0.0 ns | **0.0 ns** | 100.0 ns | 100.0 ns | 100.0 ns | 100.0 ns | 25,800.0 ns | 95.6 ns | In-Memory (L1d / Registers) |
-| **3. Pre-Trade Risk Gate** | 99,500 | 500.0 ns | **700.0 ns** | 700.0 ns | 800.0 ns | 800.0 ns | 2,100.0 ns | 39,600.0 ns | 207.9 ns | In-Memory (Open-Addr Table) |
-| **4. Execution Engine Dedup** | 20,000 | 0.0 ns | **2,800.0 ns**| 2,900.0 ns | 3,100.0 ns | 5,100.0 ns | 12,100.0 ns| 22,000.0 ns | 1,121.9 ns | In-Memory (Two-Phase Hash) |
-| **5. WAL Buffer Append** | 100,000 | 0.0 ns | **0.0 ns** | 100.0 ns | 200.0 ns | 2,600.0 ns | 14,600.0 ns| 117,600.0 ns| 840.6 ns | Userspace Buffer (`fwrite`) |
-| **6. WAL Hardware Sync** | 500 | 743.8 µs | **850.2 µs** | 961.8 µs | 1,120.4 µs | 2,232.5 µs | 6,836.6 µs | 6,836.6 µs | 334.2 µs | Physical Micron NVMe SSD |
+| **1. SPSC Queue Push** | Batched Microbench (10k/batch)| 1,000,000 | 0.6 ns | **0.6 ns** | 0.6 ns | 0.8 ns | 0.8 ns | 0.8 ns | 0.0 ns | In-Memory (1.61B ops/sec)|
+| **2. SPSC Queue Pop** | Batched Microbench (10k/batch)| 1,000,000 | 0.3 ns | **0.3 ns** | 0.3 ns | 0.3 ns | 0.3 ns | 0.3 ns | 0.0 ns | In-Memory (3.84B ops/sec)|
+| **3. SPSC 2-Thread E2E Concurrency** | Producer Thread -> Consumer Thread | 200,000 | 5.0 µs | **1.47 ms** | 2.58 ms | 2.66 ms | 2.68 ms | 2.68 ms | 811.5 µs | Cross-Thread Monitored Cache |
+| **4. Pre-Trade Risk Check** | Open-addressing slot table scan | 99,500 | 583.3 ns| **617.6 ns** | 660.0 ns | 802.8 ns | 2.01 µs | 28.86 µs | 188.8 ns | In-Memory Deterministic Gate |
+| **5. Execution Dedup & State Mutate** | 2-Phase Commit (Hash + Ledger)| 20,000 | 16.4 ns | **2,718.7 ns**| 2,799.1 ns | 4,000.7 ns | 4,344.5 ns | 25.61 µs | 896.5 ns | In-Memory Mutex-Free State |
+| **6. WAL Buffer Write (write)** | Stdio userspace stream append | 50,000 | 31.2 ns | **34.2 ns** | 40.2 ns | 2,971.7 ns | 15.78 µs | 416.2 µs | 2,192.6 ns | Userspace Stdio Buffer |
+| **7. WAL OS Page Flush (flush)** | Transfer stdio buffer to OS cache | 1,000 | 1.61 µs | **2.12 µs** | 2.95 µs | 15.96 µs | 80.32 µs | 80.32 µs | 3.63 µs | OS Page Cache (Kernel Space) |
+| **8. WAL Hardware Sync (_commit)** | Physical NVMe flash controller commit | 500 | 725.4 µs | **847.2 µs** | 1,049.9 µs | 1,939.8 µs | 2,950.5 µs | 2,950.5 µs | 245.5 µs | Physical Micron NVMe Flash |
 
-*(Note: 0.0 ns readings represent operations completing within clock quantization intervals below 100ns).*
+*(Note: Amortized queue operations achieve sub-nanosecond execution via L1 instruction & data pipelining; physical hardware flash persistence requires ~847 µs).*
 
 ---
 

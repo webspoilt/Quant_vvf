@@ -12,6 +12,8 @@
 #include <cstring>
 #include <cmath>
 #include <memory>
+#include <string>
+#include <iostream>
 
 namespace hft::engine {
 
@@ -27,15 +29,17 @@ enum class OrderStatus : uint8_t {
 
 enum class ExecutionResult : uint8_t {
     SUCCESS_APPLIED = 0,
-    REJECT_RESERVED_EXEC_ID = 1,      // P0 FIX: Explicit rejection for ID 0 or UINT64_MAX
+    REJECT_RESERVED_EXEC_ID = 1,      // Rejects ID 0 or UINT64_MAX
     REJECT_DUPLICATE_EXEC_ID = 2,
     REJECT_TERMINAL_ORDER = 3,
     REJECT_MISMATCHED_ORDER_ID = 4,
     REJECT_WRONG_SIDE = 5,
     REJECT_INVALID_QUANTITY = 6,
-    REJECT_INVALID_PRICE = 7,         // P0 FIX: Rejects NaN, Inf, zero, and negative prices
+    REJECT_INVALID_PRICE = 7,         // Rejects NaN, Inf, zero, and negative prices
     REJECT_OVERFILL = 8,
-    REJECT_RISK_BREACH = 9
+    REJECT_RISK_BREACH = 9,
+    REJECT_WAL_IO_ERROR = 10,         // WAL file unopen, write error, or flush error
+    REJECT_WAL_DURABILITY_BREACH = 11 // fsync / _commit failure under durable policy
 };
 
 struct InFlightOrder {
@@ -54,11 +58,27 @@ struct InFlightOrder {
 /**
  * High-Frequency Order Lifecycle & Execution Manager
  * 
- * Seventh Remediation Features:
- * 1. Strict Reserved Execution ID Protection: Rejects execution IDs 0 and UINT64_MAX before any fill logic.
- * 2. Atomic Price & Quantity Validation: Rejects non-finite, zero, or negative prices/quantities.
- * 3. Pre-Validation Transaction Guard: Invariants are verified before any internal state or risk mutation.
- * 4. Tombstone-Safe Deduplication & Terminal Immutability.
+ * Strict Transactional Execution Flow:
+ * 1. Validate report fields (Execution ID != 0/MAX, finite positive price & qty).
+ * 2. Check execution ID duplication in tombstone-safe hash table.
+ * 3. Validate order identity and active state (must match in-flight, not terminal).
+ * 4. Validate side and quantity constraints.
+ * 5. Validate overfill constraints against cumulative filled quantity.
+ * 6. Calculate prospective position & risk ledger limits.
+ * 7. Verify and tentatively record risk reservation fill.
+ * 8. Construct structured WAL journal event.
+ * 9. Append event to write-ahead log.
+ * 10. Check file write result.
+ * 11. Check userspace flush result.
+ * 12. Check durable synchronization result (_commit/fsync) under active policy.
+ * 13. Only upon confirmed write/durability success:
+ *     - Commit execution ID to deduplication ring and hash table.
+ *     - Mutate in-flight order cumulative filled quantity & status.
+ *     - Mutate portfolio delta and position tracking.
+ * 14. If WAL append fails:
+ *     - Roll back tentatively applied risk reservation.
+ *     - Do NOT commit execution ID (allowing safe retry).
+ *     - Return explicit REJECT_WAL_IO_ERROR or REJECT_WAL_DURABILITY_BREACH.
  */
 class HftExecutionEngine {
 public:
@@ -70,7 +90,8 @@ public:
 
     explicit HftExecutionEngine(const risk::RiskConfig& risk_cfg)
         : risk_gate_(risk_cfg), current_spot_(0.0), current_delta_btc_(0.0),
-          last_processed_spot_(0.0), next_order_id_(0), fifo_head_(0), fifo_count_(0) {
+          last_processed_spot_(0.0), next_order_id_(0), fifo_head_(0), fifo_count_(0),
+          reconciliation_required_(false) {
         for (size_t i = 0; i < EXEC_DEDUP_CAPACITY; ++i) {
             dedup_table_[i] = EMPTY_SLOT;
         }
@@ -160,7 +181,7 @@ public:
         last_processed_spot_ = depth.spot_index;
         current_spot_ = depth.spot_index;
 
-        if (std::abs(current_delta_btc_) >= 0.15 && !has_active_order()) {
+        if (std::abs(current_delta_btc_) >= 0.15 && !has_active_order() && !reconciliation_required_) {
             net::OrderRequest rebalance_order;
             rebalance_order.msg_type = net::MessageType::ORDER_SUBMIT;
             rebalance_order.side = current_delta_btc_ > 0 ? net::Side::SELL : net::Side::BUY;
@@ -186,24 +207,47 @@ public:
                 in_flight_.cumulative_filled_qty = 0.0;
                 in_flight_.price = rebalance_order.price;
                 in_flight_.status = OrderStatus::PENDING_NEW;
+
+                if (journal_) {
+                    (void)journal_->append_record(
+                        JournalRecordType::ORDER_SUBMITTED,
+                        0,
+                        rebalance_order.order_id,
+                        "BTC-PERPETUAL",
+                        static_cast<uint8_t>(rebalance_order.side),
+                        rebalance_order.quantity,
+                        rebalance_order.price,
+                        host_now_ns,
+                        0
+                    );
+                }
             }
         }
     }
 
-    // Fully Validated Atomic Execution Report Handler
+    /**
+     * Fully Validated Atomic 2-Phase Execution Report Handler
+     * Transaction Flow with Rollback on WAL Append Failure
+     */
     inline ExecutionResult on_execution_report(
         uint64_t exec_id,
         uint64_t order_id,
         net::Side side,
         double filled_qty,
-        double fill_price
+        double fill_price,
+        uint64_t exch_seq = 0
     ) noexcept {
-        // P0 FIX: 1. Strict Reserved Execution ID Rejection (0 or UINT64_MAX)
+        // Halt check: If un-reconciled state exists, refuse execution
+        if (reconciliation_required_) [[unlikely]] {
+            return ExecutionResult::REJECT_RISK_BREACH;
+        }
+
+        // 1. Reserved Execution ID Rejection (0 or UINT64_MAX)
         if (exec_id == EMPTY_SLOT || exec_id == TOMBSTONE) [[unlikely]] {
             return ExecutionResult::REJECT_RESERVED_EXEC_ID;
         }
 
-        // P0 FIX: 2. Fill Price Validation (NaN, Inf, <= 0)
+        // 2. Fill Price Validation (NaN, Inf, <= 0)
         if (!std::isfinite(fill_price) || fill_price <= 0.0) [[unlikely]] {
             return ExecutionResult::REJECT_INVALID_PRICE;
         }
@@ -240,25 +284,47 @@ public:
             return ExecutionResult::REJECT_OVERFILL;
         }
 
-        // 9. Risk ledger reservation fill validation (all checks passed prior to commit)
+        // 9. Risk ledger reservation fill validation (phase 1: tentative reservation update)
         bool risk_updated = risk_gate_.record_fill(order_id, side, filled_qty);
         if (!risk_updated) [[unlikely]] {
             return ExecutionResult::REJECT_RISK_BREACH;
         }
 
-        // ATOMIC TRANSACTION: Commit execution ID only after all validations & risk updates succeed
-        commit_exec_id(exec_id);
-
+        // 10. WAL Persistence Check (Phase 2: Durable Logging)
         if (journal_) {
-            journal_->append_execution(
+            uint64_t now_ns = sync::DualDomainClock::get_host_monotonic_ns();
+            WalStatus wal_res = journal_->append_record(
+                JournalRecordType::ORDER_FILLED,
                 exec_id,
                 order_id,
+                "BTC-PERPETUAL",
                 static_cast<uint8_t>(side),
                 filled_qty,
                 fill_price,
-                sync::DualDomainClock::get_host_monotonic_ns()
+                now_ns,
+                exch_seq
             );
+
+            if (wal_res != WalStatus::SUCCESS) [[unlikely]] {
+                // TRANSACTION ROLLBACK:
+                // Revert risk reservation & position mutation
+                // Reverse the fill applied in step 9
+                if (side == net::Side::BUY) {
+                    risk_gate_.adjust_position_for_recovery(-filled_qty);
+                } else {
+                    risk_gate_.adjust_position_for_recovery(filled_qty);
+                }
+                // Do NOT commit execution ID; do NOT update in_flight status
+                if (wal_res == WalStatus::FSYNC_FAILED) {
+                    return ExecutionResult::REJECT_WAL_DURABILITY_BREACH;
+                }
+                return ExecutionResult::REJECT_WAL_IO_ERROR;
+            }
         }
+
+        // 11. COMMIT PHASE: All validations & durable logging succeeded
+        // Commit execution ID to deduplication ring
+        commit_exec_id(exec_id);
 
         in_flight_.cumulative_filled_qty += filled_qty;
 
@@ -286,6 +352,20 @@ public:
             }
             risk_gate_.release_reservation(order_id);
             in_flight_.status = OrderStatus::CANCELED;
+
+            if (journal_) {
+                (void)journal_->append_record(
+                    JournalRecordType::ORDER_CANCELLED,
+                    0,
+                    order_id,
+                    "BTC-PERPETUAL",
+                    static_cast<uint8_t>(in_flight_.side),
+                    in_flight_.remaining_qty(),
+                    in_flight_.price,
+                    sync::DualDomainClock::get_host_monotonic_ns(),
+                    0
+                );
+            }
             return true;
         }
         return false;
@@ -300,6 +380,20 @@ public:
             }
             risk_gate_.release_reservation(order_id);
             in_flight_.status = OrderStatus::REJECTED;
+
+            if (journal_) {
+                (void)journal_->append_record(
+                    JournalRecordType::ORDER_REJECTED,
+                    0,
+                    order_id,
+                    "BTC-PERPETUAL",
+                    static_cast<uint8_t>(in_flight_.side),
+                    in_flight_.remaining_qty(),
+                    in_flight_.price,
+                    sync::DualDomainClock::get_host_monotonic_ns(),
+                    0
+                );
+            }
             return true;
         }
         return false;
@@ -320,15 +414,77 @@ public:
     [[nodiscard]] const InFlightOrder& get_in_flight_order() const noexcept { return in_flight_; }
     [[nodiscard]] double get_position_btc() const noexcept { return risk_gate_.get_net_position_btc(); }
     [[nodiscard]] double get_gross_exposure_btc() const noexcept { return risk_gate_.get_gross_exposure_btc(); }
+    [[nodiscard]] bool is_reconciliation_required() const noexcept { return reconciliation_required_; }
     risk::InlinePreTradeRiskGate& get_risk_gate() noexcept { return risk_gate_; }
+    DurableExecutionJournal* get_journal() noexcept { return journal_.get(); }
 
-    void enable_journal(const std::string& path) {
-        journal_ = std::make_unique<DurableExecutionJournal>(path);
-        // Recover committed executions on startup
-        auto recovered = journal_->recover_committed_records();
-        for (const auto& rec : recovered) {
-            commit_exec_id(rec.exec_id);
+    /**
+     * Initializes journal with durability policy and executes complete state crash recovery.
+     * Reconstructs deduplication cache, filled orders, positions, and detects corruption.
+     */
+    bool enable_journal(
+        const std::string& path,
+        WalDurabilityPolicy policy = WalDurabilityPolicy::SYNCHRONOUSLY_DURABLE
+    ) {
+        journal_ = std::make_unique<DurableExecutionJournal>(path, policy);
+        if (!journal_->is_open()) {
+            reconciliation_required_ = true;
+            return false;
         }
+
+        // Full State Crash Recovery Scan
+        auto recovery = journal_->scan_and_recover();
+        if (!recovery.is_clean) {
+            // Log corruption/torn record warning and require exchange reconciliation
+            std::cerr << "[WAL RECOVERY] Warning: Journal non-clean (corrupted records: "
+                      << recovery.corrupted_records_count << ", torn tail: "
+                      << recovery.torn_tail_detected << "). Reconciliation required.\n";
+            reconciliation_required_ = true;
+        }
+
+        // Replay valid committed records into state machine
+        for (const auto& rec : recovery.valid_records) {
+            auto rtype = static_cast<JournalRecordType>(rec.record_type);
+            if (rtype == JournalRecordType::ORDER_FILLED) {
+                commit_exec_id(rec.exec_id);
+                // Accumulate recovered position
+                if (rec.side == 0) { // BUY
+                    risk_gate_.adjust_position_for_recovery(rec.filled_qty);
+                } else { // SELL
+                    risk_gate_.adjust_position_for_recovery(-rec.filled_qty);
+                }
+            } else if (rtype == JournalRecordType::ORDER_SUBMITTED) {
+                if (rec.order_id > next_order_id_) {
+                    next_order_id_ = rec.order_id;
+                }
+            }
+        }
+
+        return recovery.is_clean;
+    }
+
+    /**
+     * Authoritative Exchange Snapshot Reconciliation Gateway
+     * Verifies recovered local state against exchange authoritative account positions.
+     */
+    bool reconcile_with_exchange(
+        double authoritative_position_btc,
+        uint64_t authoritative_next_order_id,
+        double tolerance_btc = 1e-6
+    ) noexcept {
+        double current_pos = get_position_btc();
+        if (std::abs(current_pos - authoritative_position_btc) > tolerance_btc) {
+            // Discrepancy beyond tolerance: remain halted
+            reconciliation_required_ = true;
+            return false;
+        }
+
+        if (authoritative_next_order_id > next_order_id_) {
+            next_order_id_ = authoritative_next_order_id;
+        }
+
+        reconciliation_required_ = false;
+        return true;
     }
 
 private:
@@ -343,6 +499,7 @@ private:
     uint64_t fifo_ring_[EXEC_FIFO_CAPACITY];
     size_t fifo_head_{0};
     size_t fifo_count_{0};
+    bool reconciliation_required_{false};
 };
 
 } // namespace hft::engine

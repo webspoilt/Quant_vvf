@@ -5,6 +5,9 @@
 #include <cstring>
 #include <string>
 #include <vector>
+#include <system_error>
+#include <stdexcept>
+#include <cerrno>
 
 #if defined(_WIN32)
 #include <io.h>
@@ -16,33 +19,456 @@
 
 namespace hft::engine {
 
+// Supported WAL Schema Versions
+inline constexpr uint32_t WAL_MAGIC_V1 = 0x57414C31; // "WAL1"
+inline constexpr uint32_t WAL_MAGIC_V2 = 0x57414C32; // "WAL2"
+inline constexpr uint16_t WAL_SCHEMA_VERSION_V1 = 1;
+inline constexpr uint16_t WAL_SCHEMA_VERSION_V2 = 2;
+
+// Transaction & Record Types
+enum class JournalRecordType : uint16_t {
+    UNKNOWN = 0,
+    ORDER_SUBMITTED = 1,
+    ORDER_CANCELLED = 2,
+    ORDER_REJECTED = 3,
+    ORDER_FILLED = 4,
+    ACCOUNT_SNAPSHOT = 5
+};
+
+// Durability Policy
+enum class WalDurabilityPolicy : uint8_t {
+    BUFFERED = 0,               // In-memory / userspace std::fwrite buffer (no fflush/fsync on append)
+    OS_FLUSHED = 1,             // std::fflush to OS page cache per record
+    SYNCHRONOUSLY_DURABLE = 2,  // std::fflush + fsync / _commit hardware barrier per record
+    GROUP_COMMITTED_DURABLE = 3 // Periodic or batched fsync / _commit
+};
+
+// Strict Operation Status
+enum class WalStatus : uint8_t {
+    SUCCESS = 0,
+    FILE_NOT_OPEN = 1,
+    WRITE_FAILED = 2,
+    FFLUSH_FAILED = 3,
+    FSYNC_FAILED = 4,
+    CORRUPT_RECORD = 5,
+    SEQUENCE_MISMATCH = 6,
+    VERSION_UNSUPPORTED = 7,
+    PARTIAL_RECORD = 8,
+    DISK_FULL_OR_IO_ERROR = 9
+};
+
 #pragma pack(push, 1)
+/**
+ * Binary Journal Record (WAL Version 2)
+ * Compile-time verified to be exactly 96 bytes.
+ */
 struct JournalRecord {
-    uint32_t magic{0x57414C31};       // "WAL1" format magic
-    uint16_t version{1};              // Schema version
-    uint16_t reserved{0};
-    uint64_t exec_id{0};
-    uint64_t order_id{0};
-    uint8_t side{0};
-    double filled_qty{0.0};
-    double fill_price{0.0};
-    uint64_t timestamp_ns{0};
-    uint32_t checksum{0};
+    uint32_t magic{WAL_MAGIC_V2};                  // 4 bytes: 0x57414C32 ("WAL2")
+    uint16_t version{WAL_SCHEMA_VERSION_V2};       // 2 bytes: Schema version 2
+    uint16_t record_type{static_cast<uint16_t>(JournalRecordType::ORDER_FILLED)}; // 2 bytes
+    uint32_t record_len{sizeof(JournalRecord)};    // 4 bytes: 96
+    uint64_t sequence_num{0};                      // 8 bytes: Monotonic sequence
+    uint64_t exec_id{0};                          // 8 bytes: Unique execution report ID
+    uint64_t order_id{0};                         // 8 bytes: Client order ID
+    char symbol[16]{0};                           // 16 bytes: ASCII instrument symbol null-padded
+    uint8_t side{0};                              // 1 byte: 0=BUY, 1=SELL
+    uint8_t reserved[3]{0};                       // 3 bytes: Reserved padding for 8-byte alignment
+    double filled_qty{0.0};                       // 8 bytes: Executed quantity
+    double fill_price{0.0};                       // 8 bytes: Execution price
+    uint64_t timestamp_ns{0};                     // 8 bytes: Monotonic nanoseconds
+    uint64_t exch_seq{0};                         // 8 bytes: Exchange sequence number
+    uint32_t checksum{0};                         // 4 bytes: Standard CRC32 (IEEE 802.3)
+    uint32_t reserved2{0};                        // 4 bytes: Alignment padding to exactly 96 bytes
 };
 #pragma pack(pop)
 
+static_assert(sizeof(JournalRecord) == 96, "JournalRecord must be exactly 96 bytes packed.");
+
 /**
- * Lightweight, zero-allocation durable binary execution write-ahead log (WAL).
- * Guarantees crash resilience, hardware fsync commit, and torn-record rejection.
+ * Standard IEEE 802.3 CRC32 Implementation
+ * Polynomial: 0xEDB88320 (reversed representation)
+ */
+class Crc32 {
+public:
+    static inline uint32_t calculate(const void* data, size_t length) noexcept {
+        const uint8_t* bytes = static_cast<const uint8_t*>(data);
+        uint32_t crc = 0xFFFFFFFF;
+        for (size_t i = 0; i < length; ++i) {
+            uint8_t table_idx = static_cast<uint8_t>((crc ^ bytes[i]) & 0xFF);
+            crc = (crc >> 8) ^ CRC_TABLE[table_idx];
+        }
+        return crc ^ 0xFFFFFFFF;
+    }
+
+private:
+    static inline constexpr uint32_t CRC_TABLE[256] = {
+        0x00000000, 0x77073096, 0xEE0E612C, 0x990951BA, 0x076DC419, 0x706AF48F, 0xE963A535, 0x9E6495A3,
+        0x0EDB8832, 0x79DCB8A4, 0xE0D5E91E, 0x97D2D988, 0x09B64C2B, 0x7EB17CBD, 0xE7B82D07, 0x90BF1D91,
+        0x1DB71064, 0x6AB020F2, 0xF3B97148, 0x84BE41DE, 0x1ADAD47D, 0x6DDDE4EB, 0xF4D4B551, 0x83D385C7,
+        0x136C9856, 0x646BA8C0, 0xFD62F97A, 0x8A65C9EC, 0x14015C4F, 0x63066CD9, 0xFA0F3D63, 0x8D080DF5,
+        0x3B6E20C8, 0x4C69105E, 0xD56041E4, 0xA2677172, 0x3C03E4D1, 0x4B04D447, 0xD20D85FD, 0xA50AB56B,
+        0x35B5A8FA, 0x42B2986C, 0xDBBBC9D6, 0xACBCF940, 0x32D86CE3, 0x45DF5C75, 0xDCD60DCF, 0xABD13D59,
+        0x26D930AC, 0x51DE003A, 0xC8D75180, 0xBFD06116, 0x21B4F4B5, 0x56B3C423, 0xCFBA9599, 0xB8BDA50F,
+        0x2802B89E, 0x5F058808, 0xC60CD9B2, 0xB10BE924, 0x2F6F7C87, 0x58684C11, 0xC1611DAB, 0xB6662D3D,
+        0x76DC4190, 0x01DB7106, 0x98D220BC, 0xEFD5102A, 0x71B18589, 0x06B6B51F, 0x9FBFE4A5, 0xE8B8D433,
+        0x7807C9A2, 0x0F00F934, 0x9609A88E, 0xE10E9818, 0x7F6A0DBB, 0x086D3D2D, 0x91646C97, 0xE6635C01,
+        0x6B6B51F4, 0x1C6C6162, 0x856530D8, 0xF262004E, 0x6C0695ED, 0x1B01A57B, 0x8208F4C1, 0xF50FC457,
+        0x65B0D9C6, 0x12B7E950, 0x8BBEB8EA, 0xFCB9887C, 0x62DD1DDF, 0x15DA2D49, 0x8CD37CF3, 0xFBD44C65,
+        0x4DB26158, 0x3AB551CE, 0xA3BC0074, 0xD4BB30E2, 0x4ADFA541, 0x3DD895D7, 0xA4D1C46D, 0xD3D6F4FB,
+        0x4369E96A, 0x346ED9FC, 0xAD678846, 0xDA60B8D0, 0x44042D73, 0x33031DE5, 0xAA0A4C5F, 0xDD0D7CC9,
+        0x5005713C, 0x270241AA, 0xBE0B1010, 0xC90C2086, 0x5768B525, 0x206F85B3, 0xB966D409, 0xCE61E49F,
+        0x5EDEF90E, 0x29D9C998, 0xB0D09822, 0xC7D7A8B4, 0x59B33D17, 0x2EB40D81, 0xB7BD5C3B, 0xC0BA6CAD,
+        0xEDB88320, 0x9ABFB3B6, 0x03B6E20C, 0x74B1D29A, 0xEAD54739, 0x9DD277AF, 0x04DB2615, 0x73DC1683,
+        0xE3630B12, 0x94643B84, 0x0D6D6A3E, 0x7A6A5AA8, 0xE40ECF0B, 0x9309FF9D, 0x0A00AE27, 0x7D079EB1,
+        0xF00F9344, 0x8708A3D2, 0x1E01F268, 0x6906C2FE, 0xF762575D, 0x806567CB, 0x196C3671, 0x6E6B06E7,
+        0xFED41B76, 0x89D32BE0, 0x10DA7A5A, 0x67DD4ACC, 0xF9B9DF6F, 0x8EBEEFF9, 0x17B7BE43, 0x60B08ED5,
+        0xD6D6A3E8, 0xA1D1937E, 0x38D8C2C4, 0x4FDFF252, 0xD1BB67F1, 0xA6BC5767, 0x3FB506DD, 0x48B2364B,
+        0xD80D2BDA, 0xAF0A1B4C, 0x36034AF6, 0x41047A60, 0xDF60EFC3, 0xA867DF55, 0x316E8EEF, 0x4669BE79,
+        0xCB61B38C, 0xBC66831A, 0x256FD2A0, 0x5268E236, 0xCC0C7795, 0xBB0B4703, 0x220216B9, 0x5505262F,
+        0xC5BA3BBE, 0xB2BD0B28, 0x2BB45A92, 0x5CB36A04, 0xC2D7FFA7, 0xB5D0CF31, 0x2CD99E8B, 0x5BDEAE1D,
+        0x9B64C2B0, 0xEC63F226, 0x756AA39C, 0x026D930A, 0x9C0906A9, 0xEB0E363F, 0x72076785, 0x05005713,
+        0x95BF4A82, 0xE2B87A14, 0x7BB12BAE, 0x0CB61B38, 0x92D28E9B, 0xE5D5BE0D, 0x7CDCEFB7, 0x0BDBDF21,
+        0x86D3D2D4, 0xF1D4E242, 0x68DDB3F8, 0x1FDA836E, 0x81BE16CD, 0xF6B9265B, 0x6FB077E1, 0x18B74777,
+        0x88085AE6, 0xFF0F6A70, 0x66063BCA, 0x11010B5C, 0x8F659EFF, 0xF862AE69, 0x616BFFD3, 0x166CCF45,
+        0xA00AE278, 0xD70DD2EE, 0x4E048354, 0x3903B3C2, 0xA7672661, 0xD06016F7, 0x4969474D, 0x3E6E77DB,
+        0xAED16A4A, 0xD9D65ADC, 0x40DF0B66, 0x37D83BF0, 0xA9BCAE53, 0xDEBB9EC5, 0x47B2CF7F, 0x30B5FFE9,
+        0xBDBDF21C, 0xCABAC28A, 0x53B39330, 0x24B4A3A6, 0xBAD03605, 0xCDD70693, 0x54DE5729, 0x23D967BF,
+        0xB3667A2E, 0xC4614AB8, 0x5D681B02, 0x2A6F2B94, 0xB40BBE37, 0xC30C8EA1, 0x5A05DF1B, 0x2D02EF8D
+    };
+};
+
+/**
+ * Result Structure for Journal Recovery
+ */
+struct RecoveryResult {
+    bool is_clean{true};
+    size_t valid_records_count{0};
+    size_t corrupted_records_count{0};
+    bool torn_tail_detected{false};
+    uint64_t last_sequence_num{0};
+    std::string error_message{};
+    std::vector<JournalRecord> valid_records{};
+};
+
+/**
+ * High-Integrity, Fail-Closed Durable Write-Ahead Log (WAL)
+ * Implements strict transaction semantics, hardware sync barrier checks,
+ * versioned CRC32 verification, and explicit fault recovery.
  */
 class DurableExecutionJournal {
 public:
-    explicit DurableExecutionJournal(const std::string& journal_path)
-        : journal_path_(journal_path), file_(nullptr) {
+    explicit DurableExecutionJournal(
+        const std::string& journal_path,
+        WalDurabilityPolicy policy = WalDurabilityPolicy::SYNCHRONOUSLY_DURABLE
+    ) : journal_path_(journal_path), policy_(policy), file_(nullptr),
+        next_sequence_(1), total_commits_(0), failed_commits_(0) {
         open_journal();
     }
 
     ~DurableExecutionJournal() {
+        close_journal();
+    }
+
+    // Disable copy
+    DurableExecutionJournal(const DurableExecutionJournal&) = delete;
+    DurableExecutionJournal& operator=(const DurableExecutionJournal&) = delete;
+
+    [[nodiscard]] bool is_open() const noexcept { return file_ != nullptr; }
+    [[nodiscard]] WalDurabilityPolicy get_policy() const noexcept { return policy_; }
+    [[nodiscard]] uint64_t get_next_sequence() const noexcept { return next_sequence_; }
+    [[nodiscard]] uint64_t get_total_commits() const noexcept { return total_commits_; }
+    [[nodiscard]] uint64_t get_failed_commits() const noexcept { return failed_commits_; }
+    [[nodiscard]] const std::string& get_path() const noexcept { return journal_path_; }
+
+    void set_policy(WalDurabilityPolicy policy) noexcept {
+        policy_ = policy;
+    }
+
+    void set_next_sequence(uint64_t seq) noexcept {
+        next_sequence_ = seq;
+    }
+
+    /**
+     * Appends an event record with explicit status reporting and strict durability checks.
+     */
+    [[nodiscard]] WalStatus append_record(
+        JournalRecordType rec_type,
+        uint64_t exec_id,
+        uint64_t order_id,
+        const char* symbol_str,
+        uint8_t side,
+        double filled_qty,
+        double fill_price,
+        uint64_t timestamp_ns,
+        uint64_t exch_seq = 0
+    ) noexcept {
+        if (!file_) [[unlikely]] {
+            failed_commits_++;
+            return WalStatus::FILE_NOT_OPEN;
+        }
+
+        JournalRecord rec{};
+        rec.magic = WAL_MAGIC_V2;
+        rec.version = WAL_SCHEMA_VERSION_V2;
+        rec.record_type = static_cast<uint16_t>(rec_type);
+        rec.record_len = static_cast<uint32_t>(sizeof(JournalRecord));
+        rec.sequence_num = next_sequence_++;
+        rec.exec_id = exec_id;
+        rec.order_id = order_id;
+        if (symbol_str) {
+            std::strncpy(rec.symbol, symbol_str, sizeof(rec.symbol) - 1);
+            rec.symbol[sizeof(rec.symbol) - 1] = '\0';
+        }
+        rec.side = side;
+        rec.filled_qty = filled_qty;
+        rec.fill_price = fill_price;
+        rec.timestamp_ns = timestamp_ns;
+        rec.exch_seq = exch_seq;
+        rec.checksum = calculate_record_checksum(rec);
+
+        // 1. Write binary record to stdio stream buffer
+        size_t written = std::fwrite(&rec, sizeof(JournalRecord), 1, file_);
+        if (written != 1) [[unlikely]] {
+            failed_commits_++;
+            return WalStatus::WRITE_FAILED;
+        }
+
+        // 2. Evaluate according to configured Durability Policy
+        if (policy_ == WalDurabilityPolicy::BUFFERED) {
+            total_commits_++;
+            return WalStatus::SUCCESS;
+        }
+
+        // Policy requires at least OS flush
+        if (std::fflush(file_) != 0) [[unlikely]] {
+            failed_commits_++;
+            return WalStatus::FFLUSH_FAILED;
+        }
+
+        if (policy_ == WalDurabilityPolicy::OS_FLUSHED) {
+            total_commits_++;
+            return WalStatus::SUCCESS;
+        }
+
+        if (policy_ == WalDurabilityPolicy::SYNCHRONOUSLY_DURABLE) {
+            int fd = fileno(file_);
+            if (fd < 0) [[unlikely]] {
+                failed_commits_++;
+                return WalStatus::FSYNC_FAILED;
+            }
+            if (fsync(fd) != 0) [[unlikely]] {
+                failed_commits_++;
+                return WalStatus::FSYNC_FAILED;
+            }
+            total_commits_++;
+            return WalStatus::SUCCESS;
+        }
+
+        // GROUP_COMMITTED_DURABLE returns SUCCESS after userspace flush; group coordinator issues sync
+        total_commits_++;
+        return WalStatus::SUCCESS;
+    }
+
+    /**
+     * Backward-compatible fill append API
+     */
+    [[nodiscard]] inline bool append_execution(
+        uint64_t exec_id,
+        uint64_t order_id,
+        uint8_t side,
+        double filled_qty,
+        double fill_price,
+        uint64_t timestamp_ns
+    ) noexcept {
+        WalStatus st = append_record(
+            JournalRecordType::ORDER_FILLED,
+            exec_id,
+            order_id,
+            "BTC-PERPETUAL",
+            side,
+            filled_qty,
+            fill_price,
+            timestamp_ns,
+            0
+        );
+        return st == WalStatus::SUCCESS;
+    }
+
+    /**
+     * Manual hardware sync barrier (for group commit or explicit sync checkpoints)
+     */
+    [[nodiscard]] WalStatus flush_and_sync() noexcept {
+        if (!file_) [[unlikely]] return WalStatus::FILE_NOT_OPEN;
+        if (std::fflush(file_) != 0) [[unlikely]] {
+            failed_commits_++;
+            return WalStatus::FFLUSH_FAILED;
+        }
+        int fd = fileno(file_);
+        if (fd < 0 || fsync(fd) != 0) [[unlikely]] {
+            failed_commits_++;
+            return WalStatus::FSYNC_FAILED;
+        }
+        return WalStatus::SUCCESS;
+    }
+
+    /**
+     * Comprehensive Crash Recovery Scanner
+     * Parses both V1 and V2 records, validates sequence monotonicity,
+     * verifies CRC32 checksums, detects torn tails and middle corruption.
+     */
+    [[nodiscard]] RecoveryResult scan_and_recover() {
+        RecoveryResult res{};
+        std::FILE* r_file = std::fopen(journal_path_.c_str(), "rb");
+        if (!r_file) {
+            res.is_clean = true; // Clean startup if journal does not yet exist
+            return res;
+        }
+
+        uint64_t expected_seq = 1;
+
+        while (true) {
+            uint32_t magic = 0;
+            size_t n = std::fread(&magic, sizeof(uint32_t), 1, r_file);
+            if (n == 0) {
+                // End of file cleanly reached
+                break;
+            }
+
+            if (magic == WAL_MAGIC_V2) {
+                // V2 Record: Seek back 4 bytes and read full JournalRecord
+                std::fseek(r_file, -static_cast<long>(sizeof(uint32_t)), SEEK_CUR);
+                JournalRecord rec{};
+                size_t r = std::fread(&rec, sizeof(JournalRecord), 1, r_file);
+                if (r != 1) {
+                    // Torn partial record at end of file
+                    res.torn_tail_detected = true;
+                    res.is_clean = false;
+                    break;
+                }
+
+                // Check version
+                if (rec.version != WAL_SCHEMA_VERSION_V2 || rec.record_len != sizeof(JournalRecord)) {
+                    res.corrupted_records_count++;
+                    res.is_clean = false;
+                    continue;
+                }
+
+                // Verify CRC32
+                uint32_t expected_crc = calculate_record_checksum(rec);
+                if (rec.checksum != expected_crc) {
+                    res.corrupted_records_count++;
+                    res.is_clean = false;
+                    continue;
+                }
+
+                // Validate sequence monotonicity
+                if (rec.sequence_num != expected_seq && expected_seq != 1) {
+                    res.corrupted_records_count++;
+                    res.is_clean = false;
+                }
+                expected_seq = rec.sequence_num + 1;
+                res.last_sequence_num = rec.sequence_num;
+
+                res.valid_records.push_back(rec);
+                res.valid_records_count++;
+            } else if (magic == WAL_MAGIC_V1) {
+                // Backward-compatible V1 Record layout (57 bytes packed)
+#pragma pack(push, 1)
+                struct LegacyRecordV1 {
+                    uint32_t magic;
+                    uint16_t version;
+                    uint16_t reserved;
+                    uint64_t exec_id;
+                    uint64_t order_id;
+                    uint8_t side;
+                    double filled_qty;
+                    double fill_price;
+                    uint64_t timestamp_ns;
+                    uint32_t checksum;
+                };
+#pragma pack(pop)
+                static_assert(sizeof(LegacyRecordV1) == 53, "LegacyRecordV1 must be 53 bytes packed");
+
+                std::fseek(r_file, -static_cast<long>(sizeof(uint32_t)), SEEK_CUR);
+                LegacyRecordV1 leg{};
+                size_t r = std::fread(&leg, sizeof(LegacyRecordV1), 1, r_file);
+                if (r != 1) {
+                    res.torn_tail_detected = true;
+                    res.is_clean = false;
+                    break;
+                }
+
+                // Verify legacy checksum
+                uint32_t sum = 0x55AA55AA;
+                const uint8_t* p = reinterpret_cast<const uint8_t*>(&leg);
+                for (size_t i = 0; i < sizeof(LegacyRecordV1) - sizeof(uint32_t); ++i) {
+                    sum = ((sum << 5) + sum) ^ p[i];
+                }
+                if (leg.checksum != sum) {
+                    res.corrupted_records_count++;
+                    res.is_clean = false;
+                    continue;
+                }
+
+                JournalRecord converted{};
+                converted.magic = WAL_MAGIC_V2;
+                converted.version = WAL_SCHEMA_VERSION_V2;
+                converted.record_type = static_cast<uint16_t>(JournalRecordType::ORDER_FILLED);
+                converted.record_len = sizeof(JournalRecord);
+                converted.sequence_num = expected_seq++;
+                converted.exec_id = leg.exec_id;
+                converted.order_id = leg.order_id;
+                std::strncpy(converted.symbol, "BTC-PERPETUAL", sizeof(converted.symbol));
+                converted.side = leg.side;
+                converted.filled_qty = leg.filled_qty;
+                converted.fill_price = leg.fill_price;
+                converted.timestamp_ns = leg.timestamp_ns;
+                converted.checksum = calculate_record_checksum(converted);
+
+                res.last_sequence_num = converted.sequence_num;
+                res.valid_records.push_back(converted);
+                res.valid_records_count++;
+            } else {
+                // Unrecognized magic bytes -> file corruption
+                res.corrupted_records_count++;
+                res.is_clean = false;
+                // Read next byte to resynchronize or stop
+                std::fseek(r_file, -3L, SEEK_CUR);
+            }
+        }
+
+        std::fclose(r_file);
+        next_sequence_ = expected_seq;
+        return res;
+    }
+
+    /**
+     * Backward-compatible vector recovery API
+     */
+    [[nodiscard]] std::vector<JournalRecord> recover_committed_records() {
+        auto res = scan_and_recover();
+        return res.valid_records;
+    }
+
+    static inline uint32_t calculate_record_checksum(const JournalRecord& rec) noexcept {
+        // Calculate CRC32 over the record excluding checksum and trailing padding (last 8 bytes)
+        constexpr size_t HASHABLE_BYTES = sizeof(JournalRecord) - (sizeof(uint32_t) * 2);
+        return Crc32::calculate(&rec, HASHABLE_BYTES);
+    }
+
+private:
+    std::string journal_path_;
+    WalDurabilityPolicy policy_;
+    std::FILE* file_;
+    uint64_t next_sequence_;
+    uint64_t total_commits_;
+    uint64_t failed_commits_;
+
+    void open_journal() {
+        file_ = std::fopen(journal_path_.c_str(), "ab");
+    }
+
+    void close_journal() noexcept {
         if (file_) {
             std::fflush(file_);
             int fd = fileno(file_);
@@ -53,79 +479,6 @@ public:
             file_ = nullptr;
         }
     }
-
-    // Append-only write of committed execution transaction with hardware fsync
-    inline bool append_execution(
-        uint64_t exec_id,
-        uint64_t order_id,
-        uint8_t side,
-        double filled_qty,
-        double fill_price,
-        uint64_t timestamp_ns
-    ) noexcept {
-        if (!file_) [[unlikely]] return false;
-
-        JournalRecord rec;
-        rec.magic = 0x57414C31;
-        rec.version = 1;
-        rec.reserved = 0;
-        rec.exec_id = exec_id;
-        rec.order_id = order_id;
-        rec.side = side;
-        rec.filled_qty = filled_qty;
-        rec.fill_price = fill_price;
-        rec.timestamp_ns = timestamp_ns;
-        rec.checksum = calculate_checksum(rec);
-
-        size_t written = std::fwrite(&rec, sizeof(JournalRecord), 1, file_);
-        if (written == 1) {
-            std::fflush(file_);
-            int fd = fileno(file_);
-            if (fd >= 0) {
-                fsync(fd); // Physical platter/NVMe persistent commit
-            }
-            return true;
-        }
-        return false;
-    }
-
-    // Recover all committed executions from disk upon restart, safely ignoring torn records
-    std::vector<JournalRecord> recover_committed_records() {
-        std::vector<JournalRecord> records;
-        std::FILE* r_file = std::fopen(journal_path_.c_str(), "rb");
-        if (!r_file) return records;
-
-        JournalRecord rec;
-        while (std::fread(&rec, sizeof(JournalRecord), 1, r_file) == 1) {
-            // Verify magic, schema version, and cryptographic Adler/FNV checksum
-            if (rec.magic == 0x57414C31 && rec.version == 1) {
-                if (rec.checksum == calculate_checksum(rec)) {
-                    records.push_back(rec);
-                }
-            }
-        }
-        std::fclose(r_file);
-        return records;
-    }
-
-private:
-    std::string journal_path_;
-    std::FILE* file_;
-
-    void open_journal() {
-        file_ = std::fopen(journal_path_.c_str(), "ab");
-    }
-
-    static inline uint32_t calculate_checksum(const JournalRecord& rec) noexcept {
-        uint32_t sum = 0x55AA55AA;
-        const uint8_t* p = reinterpret_cast<const uint8_t*>(&rec);
-        // Exclude the checksum field itself (last 4 bytes)
-        for (size_t i = 0; i < sizeof(JournalRecord) - sizeof(uint32_t); ++i) {
-            sum = ((sum << 5) + sum) ^ p[i];
-        }
-        return sum;
-    }
 };
 
 } // namespace hft::engine
-

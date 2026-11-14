@@ -53,6 +53,12 @@ jobs:
           clang++ -std=c++20 -O2 -I../include test_fifth_remediation.cpp -o test_fifth
           ./test_fifth
 
+      - name:       - name: Compile & Run WAL Transaction Integrity & Durability Suite (7 Tests)
+        run: |
+          cd hft/tests
+          clang++ -std=c++20 -O2 -I../include test_wal_integrity.cpp -o test_wal
+          ./test_wal
+
       - name: Compile & Run Hardware Latency Benchmark Harness
         run: |
           cd hft/benchmarks

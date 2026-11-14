@@ -9,7 +9,7 @@
 ## 1. Measurement Principles & Disclosures
 
 ### A. Clock Source & Serialization
-- Measurements utilize `std::chrono::steady_clock` calibrated against the platform hardware invariant TSC / QueryPerformanceCounter.
+- Measurements utilize `Calibrated hardware RDTSCP instruction with memory serialization barriers and std::chrono::steady_clock` calibrated against the platform hardware invariant TSC / QueryPerformanceCounter.
 - To prevent out-of-order execution reordering across measurement boundaries, assembly memory fences and atomic releases (`std::memory_order_release` / `std::memory_order_acquire`) serialize the measured sections.
 - CPU cycles are never presented as nanoseconds without documented nominal frequency conversion.
 
@@ -40,6 +40,6 @@ For every stage, the following percentiles are computed on the sorted distributi
 4. **Stage 4: Execution Engine Dedup & Mutate (`hft::engine::HftExecutionEngine::on_execution_report`):**
    - Rejects reserved IDs (0, `UINT64_MAX`), verifies atomic two-phase deduplication table, checks terminal status immutability, validates price/quantity, and updates position ledger.
 5. **Stage 5: WAL Buffer Append (`std::fwrite` to userspace buffer):**
-   - Appends 40-byte packed binary `JournalRecord` with magic header (`0x57414C31`), CRC checksum, and timestamp.
+   - Appends 96-byte packed binary (compile-time asserted) `JournalRecord` with magic header (`0x57414C31`), standard IEEE 802.3 CRC32 checksum, and timestamp.
 6. **Stage 6: True Hardware Durability Commit (`_commit` / `fsync`):**
    - Flushes userspace buffer and issues NVMe hardware flush command forcing non-volatile NAND persistence.

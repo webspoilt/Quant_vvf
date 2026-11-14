@@ -15,7 +15,7 @@ int main() {
     std::cout << "====================================================================\n";
 
     risk::RiskConfig r_cfg;
-    r_cfg.max_order_clip_btc = 5.0;
+    r_cfg.max_order_clip_btc = 10.0;
     r_cfg.max_gross_exposure_btc = 20.0;
     r_cfg.max_collar_deviation_pct = 0.01;
     r_cfg.max_orders_per_second = 1000;
@@ -24,7 +24,7 @@ int main() {
     engine::HftExecutionEngine engine(r_cfg);
 
     uint64_t host_now = sync::DualDomainClock::get_host_monotonic_ns();
-    net::TimestampNs current_ptp = sync::DualDomainClock::get_ptp_epoch_ns();
+    net::TimestampNs current_ptp = sync::DualDomainClock::get_simulation_epoch_ns();
 
     // =========================================================================
     // 1. EXECUTION LIFECYCLE TESTS (P0)

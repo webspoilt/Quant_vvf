@@ -273,6 +273,10 @@ public:
     void reset_circuit_breaker() noexcept { circuit_breaker_tripped_.store(false, std::memory_order_release); }
     [[nodiscard]] bool is_halted() const noexcept { return circuit_breaker_tripped_.load(std::memory_order_relaxed); }
 
+    inline void adjust_position_for_recovery(double delta_btc) noexcept {
+        current_net_position_btc_ += delta_btc;
+    }
+
     [[nodiscard]] double get_net_position_btc() const noexcept { return current_net_position_btc_; }
     [[nodiscard]] double get_total_reserved_buy() const noexcept { return total_reserved_buy_btc_; }
     [[nodiscard]] double get_total_reserved_sell() const noexcept { return total_reserved_sell_btc_; }
