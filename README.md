@@ -3,10 +3,11 @@
 [![Python Version](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/)
 [![C++ Standard](https://img.shields.io/badge/c%2B%2B-20-blue.svg)](https://en.cppreference.com/w/cpp/20)
 [![Rust Edition](https://img.shields.io/badge/rust-2024%20edition-orange.svg)](https://www.rust-lang.org/)
+[![PyTorch](https://img.shields.io/badge/PyTorch-2.15%2B-EE4C2C.svg)](https://pytorch.org/)
 [![Type Checking](https://img.shields.io/badge/typing-mypy%20strict-green.svg)](https://mypy-lang.org/)
-[![Test Suite](https://img.shields.io/badge/tests-182%20passed-brightgreen.svg)](docs/FINAL_VERIFICATION_REPORT.md)
+[![Test Suite](https://img.shields.io/badge/tests-206%20passed-brightgreen.svg)](docs/FINAL_VERIFICATION_REPORT.md)
 [![Math Oracle](https://img.shields.io/badge/math%20oracle-QuantLib-orange.svg)](https://www.quantlib.org/)
-[![Status](https://img.shields.io/badge/status-Engineering%20Verified-success.svg)](docs/audit/FINAL_INDEPENDENT_AUDIT.md)
+[![Status](https://img.shields.io/badge/status-Research%20Grade%20Verified-success.svg)](docs/research/PAPER_REGISTRY.md)
 
 A systematic, modular research and execution platform engineered for trading the **Volatility Risk Premium (VRP)** on Deribit BTC options and inverse perpetual futures.
 
@@ -920,10 +921,10 @@ pip install -e ".[dev,prod]"
 ```
 
 ### Running the Test Suite
-The repository includes a comprehensive, multi-language verified test harness (182 total passing tests):
+The repository includes a comprehensive, multi-language verified test harness (**206 total passing tests**):
 
 ```bash
-# 1. Run Python test suite (147 tests: unit, bias checks, regression, and benchmarks)
+# 1. Run Python test suite (171 tests: unit, research math, deep learning, bias checks, and regression)
 pytest -v
 
 # 2. Run Rust SBE feed-handler tests and clippy linter (14 tests)
