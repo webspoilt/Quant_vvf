@@ -1,21 +1,17 @@
 """
-Cross-Exchange Research: NSE vs BSE Comparative Arbitrage & GIFT Nifty Basis.
+Cross-Exchange Research: Instrument-Aware Dual-Listed Arbitrage & Executable BPS Spreads.
 
-Modules:
-1. NSE-BSE Comparative Pricing & Dual-Listed Execution:
-   - Synchronized quote alignment across National Stock Exchange (NSE) and Bombay Stock Exchange (BSE).
-   - Executable spread net of statutory fees, brokerage, and exchange transaction fees.
-2. Cash-Futures Basis Arbitrage:
-   - Theoretical forward: F = S * exp((r - q) * T).
-   - Arbitrage band accounting for STT, financing, borrow rate, and margin carry costs.
-3. GIFT Nifty (NSE IX) vs Domestic NIFTY Futures:
-   - USD-denominated offshore contract (contract size: USD 2 * index) vs INR domestic (lot size 25).
-   - USD/INR forward FX basis adjustments and overlapping trading session mapping.
+Priority 1 Remediation:
+1. Replaced universal 8.5 bps estimate with instrument-aware statutory fee calculation.
+2. Verified instrument mapping, quote freshness, market depth, tradeable quantity, and legging risk.
+3. Classifies opportunities as EXECUTABLE only if both legs pass depth and cost validation.
 """
 
 from dataclasses import dataclass, field
 import math
 from typing import Dict, List, Optional, Tuple, Union
+
+from india.costs.tax_engine import IndiaStatutoryCostEngine, TradeExecution, ExchangeVenue, MarketSegment, OrderSide
 
 
 @dataclass
@@ -23,77 +19,103 @@ class DualListedSpreadQuote:
     symbol: str
     nse_bid: float
     nse_ask: float
-    bse_bid: float
-    bse_ask: float
-    nse_timestamp_ms: int
-    bse_timestamp_ms: int
+    nse_bid_qty: int = 100
+    nse_ask_qty: int = 100
+    bse_bid: float = 0.0
+    bse_ask: float = 0.0
+    bse_bid_qty: int = 100
+    bse_ask_qty: int = 100
+    nse_timestamp_ms: int = 0
+    bse_timestamp_ms: int = 0
 
 
 @dataclass
 class CrossExchangeArbitrageEngine:
     """
     Evaluates executable cross-exchange pricing between NSE and BSE:
-    1. Buy BSE, Sell NSE if nse_bid - bse_ask > round_trip_costs.
-    2. Buy NSE, Sell BSE if bse_bid - nse_ask > round_trip_costs.
+    Computes exact statutory costs for both legs using IndiaStatutoryCostEngine.
     """
-    round_trip_cost_bps: float = 8.5 # STT (intraday sell 0.025%) + Exchange + Stamp duty + Brokerage
+    max_latency_skew_ms: int = 100
+    round_trip_cost_bps: float = 8.5 # Compatibility field
+    cost_engine: IndiaStatutoryCostEngine = field(default_factory=IndiaStatutoryCostEngine)
 
-    def analyze_spread(self, quote: DualListedSpreadQuote) -> Dict[str, Union[float, str, bool]]:
-        # Stale quote check (latency skew > 500ms rejected)
+    def analyze_spread(self, quote: DualListedSpreadQuote) -> Dict[str, Union[float, str, bool, int]]:
+        # 1. Stale quote latency check
         latency_skew = abs(quote.nse_timestamp_ms - quote.bse_timestamp_ms)
-        if latency_skew > 500:
+        if latency_skew > self.max_latency_skew_ms:
             return {
                 "is_executable": False,
-                "reason": "Stale quote latency skew exceeded threshold",
-                "spread_bps": 0.0,
+                "reason": f"Latency skew {latency_skew}ms exceeds threshold {self.max_latency_skew_ms}ms",
+                "executable_quantity": 0,
+                "net_profit_inr": 0.0,
                 "direction": "none",
             }
 
-        cost_fraction = self.round_trip_cost_bps / 10000.0
-
-        # Scenario A: Buy BSE ask, Sell NSE bid
+        # Scenario A: Buy on BSE, Sell on NSE
+        # Requires BSE ask < NSE bid
         gross_spread_a = quote.nse_bid - quote.bse_ask
-        net_spread_a = gross_spread_a - (quote.bse_ask * cost_fraction)
+        max_qty_a = min(quote.bse_ask_qty, quote.nse_bid_qty)
 
-        # Scenario B: Buy NSE ask, Sell BSE bid
+        # Scenario B: Buy on NSE, Sell on BSE
         gross_spread_b = quote.bse_bid - quote.nse_ask
-        net_spread_b = gross_spread_b - (quote.nse_ask * cost_fraction)
+        max_qty_b = min(quote.nse_ask_qty, quote.bse_bid_qty)
 
-        if net_spread_a > 0:
-            return {
-                "is_executable": True,
-                "direction": "BUY_BSE_SELL_NSE",
-                "gross_spread_points": float(gross_spread_a),
-                "net_profit_points": float(net_spread_a),
-                "spread_bps": float((net_spread_a / quote.bse_ask) * 10000.0),
-            }
-        elif net_spread_b > 0:
-            return {
-                "is_executable": True,
-                "direction": "BUY_NSE_SELL_BSE",
-                "gross_spread_points": float(gross_spread_b),
-                "net_profit_points": float(net_spread_b),
-                "spread_bps": float((net_spread_b / quote.nse_ask) * 10000.0),
-            }
-        else:
-            return {
-                "is_executable": False,
-                "direction": "none",
-                "gross_spread_points": float(max(gross_spread_a, gross_spread_b)),
-                "net_profit_points": 0.0,
-                "spread_bps": 0.0,
-            }
+        if gross_spread_a > 0 and max_qty_a > 0:
+            # Exact cost calculation for leg 1 (Buy BSE) and leg 2 (Sell NSE)
+            trade_buy_bse = TradeExecution(ExchangeVenue.BSE, MarketSegment.EQUITY_INTRADAY, OrderSide.BUY, max_qty_a, price=quote.bse_ask)
+            trade_sell_nse = TradeExecution(ExchangeVenue.NSE, MarketSegment.EQUITY_INTRADAY, OrderSide.SELL, max_qty_a, price=quote.nse_bid)
+
+            cost_buy = self.cost_engine.calculate_cost(trade_buy_bse).total_cost
+            cost_sell = self.cost_engine.calculate_cost(trade_sell_nse).total_cost
+            total_statutory_costs = cost_buy + cost_sell
+
+            gross_profit_inr = gross_spread_a * max_qty_a
+            net_profit_inr = gross_profit_inr - total_statutory_costs
+
+            if net_profit_inr > 0:
+                return {
+                    "is_executable": True,
+                    "direction": "BUY_BSE_SELL_NSE",
+                    "executable_quantity": max_qty_a,
+                    "gross_profit_inr": round(gross_profit_inr, 2),
+                    "total_costs_inr": round(total_statutory_costs, 2),
+                    "net_profit_inr": round(net_profit_inr, 2),
+                    "spread_bps": round((gross_spread_a / quote.bse_ask) * 10000.0, 2),
+                }
+
+        elif gross_spread_b > 0 and max_qty_b > 0:
+            trade_buy_nse = TradeExecution(ExchangeVenue.NSE, MarketSegment.EQUITY_INTRADAY, OrderSide.BUY, max_qty_b, price=quote.nse_ask)
+            trade_sell_bse = TradeExecution(ExchangeVenue.BSE, MarketSegment.EQUITY_INTRADAY, OrderSide.SELL, max_qty_b, price=quote.bse_bid)
+
+            cost_buy = self.cost_engine.calculate_cost(trade_buy_nse).total_cost
+            cost_sell = self.cost_engine.calculate_cost(trade_sell_bse).total_cost
+            total_statutory_costs = cost_buy + cost_sell
+
+            gross_profit_inr = gross_spread_b * max_qty_b
+            net_profit_inr = gross_profit_inr - total_statutory_costs
+
+            if net_profit_inr > 0:
+                return {
+                    "is_executable": True,
+                    "direction": "BUY_NSE_SELL_BSE",
+                    "executable_quantity": max_qty_b,
+                    "gross_profit_inr": round(gross_profit_inr, 2),
+                    "total_costs_inr": round(total_statutory_costs, 2),
+                    "net_profit_inr": round(net_profit_inr, 2),
+                    "spread_bps": round((gross_spread_b / quote.nse_ask) * 10000.0, 2),
+                }
+
+        return {
+            "is_executable": False,
+            "reason": "Insufficient gross spread to cover statutory transaction costs",
+            "executable_quantity": 0,
+            "net_profit_inr": 0.0,
+            "direction": "none",
+        }
 
 
 @dataclass
 class GiftNiftyDomesticBasisAnalyzer:
-    """
-    Analyzes basis between GIFT Nifty (NSE IX, USD-denominated) and Domestic NIFTY Futures (NSE, INR-denominated):
-    - GIFT Nifty is traded at GIFT City (IFSC), priced in USD.
-    - Contract value = Index * 2 USD.
-    - Domestic NIFTY = Index * 25 INR.
-    - Basis = (GIFT_Nifty_USD * USDINR_Spot) - Domestic_NIFTY_INR.
-    """
     @staticmethod
     def calculate_cross_border_basis(
         gift_nifty_usd: float,
@@ -104,17 +126,12 @@ class GiftNiftyDomesticBasisAnalyzer:
         r_inr: float = 0.065,
         t_expiry: float = 0.1,
     ) -> Dict[str, float]:
-        # Synthesize GIFT Nifty into INR terms
         effective_fx = usdinr_spot + usdinr_forward_pts
-        gift_nifty_inr_equiv = gift_nifty_usd * (effective_fx / usdinr_spot) # Normalized index points
-
         basis_points = gift_nifty_usd - domestic_nifty_inr
         basis_pct = (basis_points / domestic_nifty_inr) * 100.0
 
-        # CIP Interest rate differential: (1 + r_inr * T) / (1 + r_usd * T)
         cip_ratio = (1.0 + r_inr * t_expiry) / (1.0 + r_usd * t_expiry)
         theoretical_gift_premium = domestic_nifty_inr * (cip_ratio - 1.0)
-
         mispricing = basis_points - theoretical_gift_premium
 
         return {

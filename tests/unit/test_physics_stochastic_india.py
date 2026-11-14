@@ -166,14 +166,16 @@ class TestIndianMarketsAndRegulatoryCompliance:
 
     def test_indian_statutory_transaction_costs(self):
         """Validates exact STT, Stamp Duty, Exchange Charges, SEBI fees, and GST on F&O trades."""
+        from datetime import date
         calc = IndiaTransactionCostCalculator(brokerage_per_order=20.0)
 
-        # 1. Equity Futures Sell: 0.02% STT
+        # 1. Equity Futures Sell: 0.02% STT under October 2024 to March 2026 schedule
         trade_fut_sell = TradeExecution(
             segment=MarketSegment.FUTURES_INDEX,
             side=OrderSide.SELL,
             quantity=50, # 2 lots of NIFTY
             price=24000.0, # Notional = 1,200,000 INR
+            trade_date=date(2025, 6, 1),
         )
         res_fut = calc.calculate_cost(trade_fut_sell)
         assert res_fut.notional_value == 1200000.0
@@ -182,12 +184,13 @@ class TestIndianMarketsAndRegulatoryCompliance:
         assert res_fut.brokerage == 20.0
         assert res_fut.total_cost > 270.0
 
-        # 2. Equity Options Sell: 0.1% STT on premium
+        # 2. Equity Options Sell: 0.1% STT on premium under 2025 schedule
         trade_opt_sell = TradeExecution(
             segment=MarketSegment.OPTIONS_INDEX,
             side=OrderSide.SELL,
             quantity=100,
             price=150.0, # Notional premium = 15,000 INR
+            trade_date=date(2025, 6, 1),
         )
         res_opt = calc.calculate_cost(trade_opt_sell)
         assert res_opt.notional_value == 15000.0
