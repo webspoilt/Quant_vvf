@@ -5,9 +5,10 @@
 [![Rust Edition](https://img.shields.io/badge/rust-2024%20edition-orange.svg)](https://www.rust-lang.org/)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.15%2B-EE4C2C.svg)](https://pytorch.org/)
 [![Type Checking](https://img.shields.io/badge/typing-mypy%20strict-green.svg)](https://mypy-lang.org/)
-[![Test Suite](https://img.shields.io/badge/tests-206%20passed-brightgreen.svg)](docs/FINAL_VERIFICATION_REPORT.md)
+[![Test Suite](https://img.shields.io/badge/tests-216%20passed-brightgreen.svg)](docs/research/MASTER_RESEARCH_ARCHITECTURE.md)
 [![Math Oracle](https://img.shields.io/badge/math%20oracle-QuantLib-orange.svg)](https://www.quantlib.org/)
-[![Status](https://img.shields.io/badge/status-Research%20Grade%20Verified-success.svg)](docs/research/PAPER_REGISTRY.md)
+[![Paper Registry](https://img.shields.io/badge/research-21%20papers%20verified-purple.svg)](docs/research/PAPER_REGISTRY.md)
+[![Status](https://img.shields.io/badge/status-Research%20Grade%20Verified-success.svg)](docs/research/MASTER_RESEARCH_ARCHITECTURE.md)
 
 A systematic, modular research and execution platform engineered for trading the **Volatility Risk Premium (VRP)** on Deribit BTC options and inverse perpetual futures.
 
@@ -31,7 +32,47 @@ Every module within this engine is constructed around strict kill gates. Complex
 
 ---
 
-## 2. Mathematical Foundation and Core Algorithms
+## 2. Advanced Multi-Layer System Architecture
+
+```mermaid
+flowchart TD
+    subgraph HFT ["1. Ultra-Low Latency Execution & Ingestion (C++20 & Rust)"]
+        UDP["Starbase UDP Multicast\n(16 Channels)"] --> SBE["Zero-Alloc Rust SBE Parser\n(v1 Header)"]
+        SBE --> RING["SPSC Lock-Free Queue"]
+        RING --> CXX["C++20 Execution Engine\n(Core-Pinned, Non-Blocking)"]
+        CXX --> RISK["Deterministic Pre-Trade Risk Ledger\n(Open-Addressing Slots)"]
+        RISK --> WAL["Durable WAL Journal\n(fsync / _commit)"]
+    end
+
+    subgraph MATH ["2. Research Mathematical Finance (Python / NumPy / SciPy)"]
+        CXX -.-> STORE["Point-in-Time Canonical Store"]
+        STORE --> VOL["Volatility Econometrics\n(GARCH, EGARCH, GJR, HAR-RV, DCC-GARCH)"]
+        STORE --> JUMP["Stochastic Jump-Diffusion\n(Merton, Kou, Bates, Heston)"]
+        STORE --> TAIL["EVT & Non-Linear Copulas\n(GPD POT, Clayton, Gumbel)"]
+        STORE --> MICRO["Microstructure & Optimal Execution\n(Hawkes, Stoikov Microprice, Avellaneda-Stoikov)"]
+    end
+
+    subgraph DL ["3. Deep Learning & Neural Forecasting (PyTorch)"]
+        STORE --> DLOB["DeepLOB\n(Conv2D + Inception + LSTM)"]
+        STORE --> TFT["Temporal Fusion Transformer\n(VSN + Attention Quantiles)"]
+        STORE --> ITRANS["iTransformer & PatchTST\n(Inverted Tokens + Patching)"]
+        STORE --> HEDGE["Deep Hedging Policy\n(CVaR Loss + Frictions)"]
+    end
+
+    subgraph GOV ["4. Model Governance & JARVIS Multi-Agent Advisory (Sandboxed)"]
+        VOL --> REG["Central Model Registry\n(RESEARCH -> APPROVED)"]
+        DLOB --> REG
+        TFT --> REG
+        REG --> ADV["JarvisModelAdvisor\n(Freshness & Uncertainty Check)"]
+        ADV --> SUP["Quantitative Research Supervisor\n(9 Specialized AI Agents)"]
+        SUP --> HUMAN{"Operator Authorization\n(Human-in-the-Loop)"}
+        HUMAN -- "Approved Rebalance" --> RISK
+    end
+```
+
+---
+
+## 3. Mathematical Foundation and Core Algorithms
 
 ### A. Inverse Coin-Margined Numeraire Payoffs and Convexity Drift
 
@@ -921,16 +962,17 @@ pip install -e ".[dev,prod]"
 ```
 
 ### Running the Test Suite
-The repository includes a comprehensive, multi-language verified test harness (**206 total passing tests**):
+The repository includes a comprehensive, multi-language verified test harness (**216 total passing tests**):
 
 ```bash
-# 1. Run Python test suite (171 tests: unit, research math, deep learning, bias checks, and regression)
+# 1. Run Python test suite (181 tests: unit, research math, deep learning, bias checks, and regression)
 pytest -v
 
 # 2. Run Rust SBE feed-handler tests and clippy linter (14 tests)
 cd rust_hft
 cargo test --all-targets --all-features
 cargo clippy --all-targets --all-features -- -D warnings
+cargo fmt --check
 cd ..
 
 # 3. Compile and execute C++20 Seventh Remediation & WAL Recovery test suite (10 tests)
