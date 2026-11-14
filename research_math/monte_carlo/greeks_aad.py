@@ -1,11 +1,14 @@
 """
 Monte Carlo Greeks and Adjoint Algorithmic Differentiation (AAD) Engine.
 
-Estimates option sensitivities (Delta, Gamma, Vega, Rho, Theta) using:
-1. Pathwise Derivative Method (infinitesimal perturbation analysis).
-2. Likelihood Ratio Method (LRM) for discontinuous payoffs (e.g., digital options).
-3. Adjoint Algorithmic Differentiation (AAD) via PyTorch Reverse-Mode Automatic Differentiation.
-4. Independent validation against analytical Black-Scholes Greeks.
+Phase 10 Remediation:
+- Explicit per-Greek method attribution:
+  * Delta: AAD (Reverse-Mode AutoDiff) & Pathwise.
+  * Vega: AAD & Pathwise.
+  * Rho: AAD & Pathwise.
+  * Gamma: High-precision finite differences with common random numbers (CRN) of exact AAD Delta.
+  * Theta: Rigorous calendar time sensitivity (dPrice / dTime) with CRN.
+- Discontinuous digital payoff handling via Likelihood Ratio Method (LRM).
 """
 
 from dataclasses import dataclass
@@ -24,12 +27,16 @@ class GreeksResult:
     vega: float
     theta: float
     rho: float
-    method: str
+    delta_method: str
+    vega_method: str
+    gamma_method: str
+    theta_method: str
+    rho_method: str
     computation_time_ms: float = 0.0
 
 
 class MonteCarloGreeksEngine:
-    """Computes Greeks using Pathwise, Likelihood-Ratio, and PyTorch Adjoint Algorithmic Differentiation."""
+    """Computes sensitivities using AAD, Pathwise, and Likelihood Ratio Methods."""
 
     @staticmethod
     def analytical_bs_greeks(s0: float, k: float, t: float, r: float, sigma: float) -> GreeksResult:
@@ -41,11 +48,11 @@ class MonteCarloGreeksEngine:
         cdf_d1 = stats.norm.cdf(d1)
         cdf_d2 = stats.norm.cdf(d2)
 
-        delta = cdf_d1
-        gamma = pdf_d1 / (s0 * sigma * math.sqrt(t))
-        vega = s0 * math.sqrt(t) * pdf_d1
-        theta = -(s0 * pdf_d1 * sigma) / (2.0 * math.sqrt(t)) - r * k * math.exp(-r * t) * cdf_d2
-        rho = k * t * math.exp(-r * t) * cdf_d2
+        delta = float(cdf_d1)
+        gamma = float(pdf_d1 / (s0 * sigma * math.sqrt(t)))
+        vega = float(s0 * math.sqrt(t) * pdf_d1)
+        theta = float(-(s0 * pdf_d1 * sigma) / (2.0 * math.sqrt(t)) - r * k * math.exp(-r * t) * cdf_d2)
+        rho = float(k * t * math.exp(-r * t) * cdf_d2)
 
         return GreeksResult(
             delta=delta,
@@ -53,7 +60,11 @@ class MonteCarloGreeksEngine:
             vega=vega,
             theta=theta,
             rho=rho,
-            method="Analytical Black-Scholes",
+            delta_method="Analytical Closed-Form",
+            vega_method="Analytical Closed-Form",
+            gamma_method="Analytical Closed-Form",
+            theta_method="Analytical Closed-Form",
+            rho_method="Analytical Closed-Form",
         )
 
     @staticmethod
@@ -105,7 +116,11 @@ class MonteCarloGreeksEngine:
             vega=vega,
             theta=theta,
             rho=rho,
-            method="Pathwise Monte Carlo",
+            delta_method="Pathwise Monte Carlo",
+            vega_method="Pathwise Monte Carlo",
+            gamma_method="Pathwise Finite-Difference (CRN)",
+            theta_method="Pathwise Time Bump (CRN)",
+            rho_method="Pathwise Monte Carlo",
             computation_time_ms=elapsed_ms,
         )
 
@@ -115,7 +130,9 @@ class MonteCarloGreeksEngine:
     ) -> GreeksResult:
         """
         Adjoint Algorithmic Differentiation (AAD) via PyTorch Reverse-Mode AutoDiff.
-        Computes exact graph gradients for S0, Sigma, and Rho in a single backward pass.
+        Delta, Vega, and Rho are computed via exact single-pass adjoint accumulation.
+        Gamma is computed via finite-difference differentiation of the exact AAD Delta (CRN).
+        Theta is computed via calendar decay differentiation of the forward simulation graph (CRN).
         """
         import time
         t0 = time.perf_counter()
@@ -129,39 +146,47 @@ class MonteCarloGreeksEngine:
 
         z = torch.randn(n_paths, dtype=torch.float64)
 
-        # Forward graph simulation
+        # 1. Forward computational graph
         st = s_t0 * torch.exp((r_t - 0.5 * sig_t**2) * t_ten + sig_t * torch.sqrt(t_ten) * z)
         payoff = torch.relu(st - k_ten)
         price = torch.exp(-r_t * t_ten) * torch.mean(payoff)
 
-        # Backward graph execution (AAD adjoint accumulation)
+        # 2. Backward graph adjoint propagation
         price.backward(retain_graph=True)
 
         delta = float(s_t0.grad.item())
         vega = float(sig_t.grad.item())
         rho = float(r_t.grad.item())
 
-        # Second-order Gamma via Hessian / grad bump
-        s_t0.grad.zero_()
-        sig_t.grad.zero_()
-        r_t.grad.zero_()
-
-        # Compute Gamma using finite-difference of exact AAD delta
+        # 3. High-precision Gamma via AAD Delta bump with Common Random Numbers (CRN)
         eps = 0.01 * s0
         s_up = torch.tensor(s0 + eps, dtype=torch.float64, requires_grad=True)
         st_up = s_up * torch.exp((r_t - 0.5 * sig_t**2) * t_ten + sig_t * torch.sqrt(t_ten) * z)
         price_up = torch.exp(-r_t * t_ten) * torch.mean(torch.relu(st_up - k_ten))
         price_up.backward()
         delta_up = float(s_up.grad.item())
-        gamma = (delta_up - delta) / eps
+        gamma = float((delta_up - delta) / eps)
+
+        # 4. Theta calculation (calendar decay dPrice / dt where d(T - dt) is negative decay)
+        dt = 1.0 / 365.0
+        t_next = torch.tensor(max(1e-4, t - dt), dtype=torch.float64)
+        st_dt = s_t0 * torch.exp((r_t - 0.5 * sig_t**2) * t_next + sig_t * torch.sqrt(t_next) * z)
+        price_dt = torch.exp(-r_t * t_next) * torch.mean(torch.relu(st_dt - k_ten))
+        # Theta = (Price(t - dt) - Price(t)) / dt (standard negative calendar decay convention)
+        theta = float((price_dt.item() - price.item()) / dt)
 
         elapsed_ms = (time.perf_counter() - t0) * 1000.0
+
         return GreeksResult(
             delta=delta,
             gamma=gamma,
             vega=vega,
-            theta=0.0,
+            theta=theta,
             rho=rho,
-            method="Adjoint Algorithmic Differentiation (AAD)",
+            delta_method="AAD Reverse-Mode PyTorch",
+            vega_method="AAD Reverse-Mode PyTorch",
+            gamma_method="AAD Delta Finite-Difference (CRN)",
+            theta_method="Simulation Graph Time Decay (CRN)",
+            rho_method="AAD Reverse-Mode PyTorch",
             computation_time_ms=elapsed_ms,
         )
