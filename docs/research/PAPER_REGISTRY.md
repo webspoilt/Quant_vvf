@@ -135,3 +135,28 @@ This registry records authoritative peer-reviewed academic literature, mathemati
 ### P-21: N-BEATS (Neural Basis Expansion)
 - **Paper:** Oreshkin, B. N., Carpov, D., Chapados, N., & Bengio, Y. (2020). *N-BEATS: Neural Basis Expansion Analysis for Interpretable Time Series Forecasting*. ICLR 2020.
 - **URL:** https://openreview.net/forum?id=r1ecqn4YwB
+
+### P-24: Monte Carlo Methods for Security Pricing
+- **Paper:** Boyle, P., Broadie, M., & Glasserman, P. (1997). *Monte Carlo Methods for Security Pricing*. Journal of Economic Dynamics and Control, 21(8-9), 1267-1321.
+- **DOI/URL:** https://doi.org/10.1016/S0165-1889(97)00028-6
+- **Domain:** Variance reduction, antithetic variates, control variates, path generation.
+
+### P-25: Quasi-Monte Carlo in Financial Engineering
+- **Paper:** Wang, X., & Sloan, I. H. (2011). *Quasi-Monte Carlo Methods in Financial Engineering: An Overview*. Operations Research, 59(4), 853-868.
+- **DOI/URL:** https://doi.org/10.1287/opre.1100.0853
+- **Domain:** Low-discrepancy sequences, Sobol sequences, digital scrambling, Brownian bridge.
+
+### P-26: Option Valuation Using the Fast Fourier Transform
+- **Paper:** Carr, P., & Madan, D. (1999). *Option Valuation Using the Fast Fourier Transform*. Journal of Computational Finance, 2(4), 61-73.
+- **DOI/URL:** https://doi.org/10.21314/JCF.1999.043
+- **Domain:** Fast Fourier transform, characteristic functions, strike grid option valuation.
+
+### P-27: Smoking Adjoints: Fast Monte Carlo Greeks
+- **Paper:** Giles, M. B., & Glasserman, P. (2006). *Smoking Adjoints: Fast Monte Carlo Greeks*. Operations Research, 54(5), 881-892.
+- **DOI/URL:** https://doi.org/10.1287/opre.1060.0315
+- **Domain:** Adjoint algorithmic differentiation (AAD), reverse-mode automatic differentiation, pathwise Greeks.
+
+### P-28: Probability of Backtest Overfitting
+- **Paper:** Bailey, D. H., Borwein, J. M., López de Prado, M., & Zhu, Q. J. (2016). *The Probability of Backtest Overfitting*. Journal of Computational Finance, 20(4), 39-69.
+- **DOI/URL:** https://doi.org/10.21314/JCF.2016.322
+- **Domain:** Multiple testing, deflated Sharpe ratio, parameter sensitivity, walk-forward stability.

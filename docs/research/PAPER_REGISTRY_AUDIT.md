@@ -43,6 +43,11 @@ To ensure strict academic honesty and eliminate decorative claims, every entry i
 | **P-20** | *Deep Hedging* (Buehler, Gonon, Teichmann, Wood) | 2019 | Quantitative Finance, 19(8), 1271-1291 | **PR-J** | 10.1080/14697688.2019.1571683 | VERIFIED |
 | **P-21** | *A Time Series is Worth 64 Words: Long-term Forecasting with Transformers* (Nie et al.) | 2023 | International Conference on Learning Representations | **PR-C** | ICLR 2023 Proceedings | VERIFIED |
 | **P-22** | *iTransformer: Inverted Transformers Are Effective for Time Series Forecasting* (Liu et al.) | 2024 | International Conference on Learning Representations | **PR-C** | ICLR 2024 Proceedings | VERIFIED |
+| **P-24** | *Monte Carlo Methods for Security Pricing* (Boyle, Broadie, Glasserman) | 1997 | Journal of Economic Dynamics & Control, 21(8-9) | **PR-J** | 10.1016/S0165-1889(97)00028-6 | VERIFIED |
+| **P-25** | *Quasi-Monte Carlo Methods in Financial Engineering* (Wang, Sloan) | 2011 | Operations Research, 59(4), 853-868 | **PR-J** | 10.1287/opre.1100.0853 | VERIFIED |
+| **P-26** | *Option Valuation Using the Fast Fourier Transform* (Carr, Madan) | 1999 | Journal of Computational Finance, 2(4), 61-73 | **PR-J** | 10.21314/JCF.1999.043 | VERIFIED |
+| **P-27** | *Smoking Adjoints: Fast Monte Carlo Greeks* (Giles, Glasserman) | 2006 | Operations Research, 54(5), 881-892 | **PR-J** | 10.1287/opre.1060.0315 | VERIFIED |
+| **P-28** | *The Probability of Backtest Overfitting* (Bailey, Borwein, López de Prado, Zhu) | 2016 | Journal of Computational Finance, 20(4), 39-69 | **PR-J** | 10.21314/JCF.2016.322 | VERIFIED |
 | **P-23** | *N-BEATS: Neural Basis Expansion Analysis for Interpretable Forecasting* (Oreshkin et al.) | 2020 | International Conference on Learning Representations | **PR-C** | ICLR 2020 Proceedings | VERIFIED |
 
 ---
