@@ -61,7 +61,7 @@
       dur="8s" repeatCount="indefinite" />
   </path>
 
-  <!-- Core Branding & Title -->
+  <!-- Core Branding &amp; Title -->
   <text x="60" y="70" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-weight="900" font-size="34" fill="#ffffff" letter-spacing="1.5">
     QUANT_VVF <tspan fill="url(#cyanGrad)">// MULTI-MARKET RESEARCH</tspan>
   </text>
@@ -76,7 +76,7 @@
     <circle cx="18" cy="17" r="5" fill="#10b981">
       <animate attributeName="opacity" values="0.4;1;0.4" dur="2s" repeatCount="indefinite" />
     </circle>
-    <text x="32" y="22" font-family="monospace" font-size="12" font-weight="700" fill="#f8fafc">231/231 TESTS PASSING</text>
+    <text x="32" y="22" font-family="monospace" font-size="12" font-weight="700" fill="#f8fafc">233/233 TESTS PASSING</text>
 
     <!-- Badge 2: Latency WAL -->
     <rect x="195" width="220" height="34" rx="6" fill="#1e293b" stroke="#06b6d4" stroke-width="1.2" />
@@ -91,40 +91,40 @@
 
   <!-- Four Pillars Container Boxes -->
   <g transform="translate(60, 195)">
-    <!-- Box 1: Physics & Stochastic -->
+    <!-- Box 1: Physics &amp; Stochastic -->
     <rect width="255" height="130" rx="8" fill="#111827" stroke="#1f2937" stroke-width="1" />
     <rect width="255" height="4" rx="2" fill="url(#cyanGrad)" />
-    <text x="18" y="32" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto" font-size="14" font-weight="700" fill="#38bdf8">PHYSICS & STOCHASTICS</text>
+    <text x="18" y="32" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto" font-size="14" font-weight="700" fill="#38bdf8">PHYSICS &amp; STOCHASTICS</text>
     <text x="18" y="58" font-family="monospace" font-size="11" fill="#cbd5e1">∂p/∂t = -∂(μp) + ½∂²(σ²p)</text>
-    <text x="18" y="78" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto" font-size="11" fill="#94a3b8">• Feynman-Kac & Fokker-Planck</text>
+    <text x="18" y="78" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto" font-size="11" fill="#94a3b8">• Feynman-Kac &amp; Fokker-Planck</text>
     <text x="18" y="96" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto" font-size="11" fill="#94a3b8">• Malliavin Greeks for Digitals</text>
     <text x="18" y="114" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto" font-size="11" fill="#94a3b8">• Rough Volterra (H ≈ 0.14)</text>
 
-    <!-- Box 2: Spectral & Information Theory -->
+    <!-- Box 2: Spectral &amp; Information Theory -->
     <rect x="275" width="255" height="130" rx="8" fill="#111827" stroke="#1f2937" stroke-width="1" />
     <rect x="275" width="255" height="4" rx="2" fill="url(#cyanGrad)" />
-    <text x="293" y="32" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto" font-size="14" font-weight="700" fill="#38bdf8">SPECTRAL & INFO THEORY</text>
+    <text x="293" y="32" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto" font-size="14" font-weight="700" fill="#38bdf8">SPECTRAL &amp; INFO THEORY</text>
     <text x="293" y="58" font-family="monospace" font-size="11" fill="#cbd5e1">λ± = σ² (1 ± √(N/T))²</text>
     <text x="293" y="78" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto" font-size="11" fill="#94a3b8">• Marchenko-Pastur Denoising</text>
     <text x="293" y="96" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto" font-size="11" fill="#94a3b8">• Sinkhorn Wasserstein Drift</text>
     <text x="293" y="114" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto" font-size="11" fill="#94a3b8">• Directed Transfer Entropy</text>
 
-    <!-- Box 3: Indian Derivatives & SABR -->
+    <!-- Box 3: Indian Derivatives &amp; SABR -->
     <rect x="550" width="255" height="130" rx="8" fill="#111827" stroke="#1f2937" stroke-width="1" />
     <rect x="550" width="255" height="4" rx="2" fill="url(#goldGrad)" />
-    <text x="568" y="32" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto" font-size="14" font-weight="700" fill="#f59e0b">INDIAN DERIVATIVES (F&O)</text>
-    <text x="568" y="58" font-family="monospace" font-size="11" fill="#cbd5e1">σ_B(F, K) SABR Skew & Parity</text>
-    <text x="568" y="78" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto" font-size="11" fill="#94a3b8">• NIFTY & BANKNIFTY Surfaces</text>
+    <text x="568" y="32" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto" font-size="14" font-weight="700" fill="#f59e0b">INDIAN DERIVATIVES (F&amp;O)</text>
+    <text x="568" y="58" font-family="monospace" font-size="11" fill="#cbd5e1">σ_B(F, K) SABR Skew &amp; Parity</text>
+    <text x="568" y="78" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto" font-size="11" fill="#94a3b8">• NIFTY &amp; BANKNIFTY Surfaces</text>
     <text x="568" y="96" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto" font-size="11" fill="#94a3b8">• Synthetic Futures Reversal</text>
     <text x="568" y="114" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto" font-size="11" fill="#94a3b8">• Implied Correlation Dispersion</text>
 
-    <!-- Box 4: Compliance & Microstructure -->
+    <!-- Box 4: Compliance &amp; Microstructure -->
     <rect x="825" width="255" height="130" rx="8" fill="#111827" stroke="#1f2937" stroke-width="1" />
     <rect x="825" width="255" height="4" rx="2" fill="url(#goldGrad)" />
-    <text x="843" y="32" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto" font-size="14" font-weight="700" fill="#f59e0b">COMPLIANCE & TRADING</text>
-    <text x="843" y="58" font-family="monospace" font-size="11" fill="#cbd5e1">SEBI OTR & Oct 2024 Tax Law</text>
-    <text x="843" y="78" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto" font-size="11" fill="#94a3b8">• STT (0.02% Fut, 0.1% Opt)</text>
+    <text x="843" y="32" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto" font-size="14" font-weight="700" fill="#f59e0b">COMPLIANCE &amp; TRADING</text>
+    <text x="843" y="58" font-family="monospace" font-size="11" fill="#cbd5e1">SEBI OTR &amp; Oct 2024 Tax Law</text>
+    <text x="843" y="78" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto" font-size="11" fill="#94a3b8">• STT (0.05% Fut, 0.15% Opt)</text>
     <text x="843" y="96" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto" font-size="11" fill="#94a3b8">• OTR Throttling Controller</text>
-    <text x="843" y="114" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto" font-size="11" fill="#94a3b8">• NSE-BSE & GIFT Nifty Basis</text>
+    <text x="843" y="114" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto" font-size="11" fill="#94a3b8">• NSE-BSE &amp; GIFT Nifty Basis</text>
   </g>
 </svg>
